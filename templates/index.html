@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    {%- block title -%}
+      {%- set title = section.title -%}
+    {%- endblock title %}
+    {%- block perm -%}
+      {%- set perm = section.permalink -%}
+    {%- endblock perm %}
+    {%- block desc -%}
+      {%- set desc = section.description -%}
+    {%- endblock desc -%}
+    <title>{{ title }}</title>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta http-equiv="content-type" content="text/html; charset=utf-8">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="keywords" content="{% block keywords %}{{ section.extra.keywords }}{% endblock keywords %}">
+    <meta name="author" content="{{ config.extra.author }}">
+    <meta name="description" content="{{ desc }}">
+    <link rel="preconnect" href="https://www.google-analytics.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    {% if config.extra.analytics -%}
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id={{ config.extra.analytics }}"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+
+      gtag('config', '{{ config.extra.analytics }}');
+    </script>
+    {%- endif %}
+    {% if config.extra.instantpage_enable -%}
+    <script src="{{ get_url(path="/js/instantpage.min.js") }}" type="module" defer></script>
+    {%- endif %}
+    {% if config.extra.katex_enable %}
+    <link rel="stylesheet" href="{{ get_url(path="/css/katex.min.css") }}">
+    <script defer src="{{ get_url(path="/js/katex.min.js") }}"></script>
+    <script defer src="{{ get_url(path="/js/mathtex-script-type.min.js") }}"></script>
+    <script src="{{ get_url(path="/js/lazysizes.min.js") }}" async></script>
+    {% endif %}
+    <link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro&display=swap" rel="stylesheet" type="text/css">
+    <link rel="stylesheet" href="{{ get_url(path="/css/main.css") }}">
+    <link rel="stylesheet" href="{{ get_url(path="/fa/fontawesome.css") }}">
+    <link rel="stylesheet" href="{{ get_url(path="/fa/brands.css") }}">
+    <link rel="stylesheet" href="{{ get_url(path="/fa/solid.css") }}">
+    <link rel="stylesheet" href="{{ get_url(path="/css/academicons.min.css") }}">
+    {% if config.extra.favicon -%}
+    <link rel="icon" type="image/ico" href="{{ config.base_url | safe }}{{ config.extra.favicon | safe }}">
+    <link rel="shortcut-icon" type="image/ico" href="{{ config.base_url | safe }}{{ config.extra.favicon | safe }}">
+    {%- endif %}
+    <link rel="canonical" href="{{ perm | safe}}">
+    {% if config.generate_rss -%}
+        <link rel="alternate" type="application/rss+xml" title="RSS" href="{{ get_url(path="rss.xml") | safe }}">
+    {%- endif %}
+
+    <!-- Facebook Open Graph -->
+    {% block fb_open_graph -%}
+    <meta name="og:description" content="{{ desc }}">
+    <meta name="og:title" content="{{ title }}">
+    <meta name="og:url" content="{{ perm | safe }}">
+    <meta name="og:type" content="article">
+    {%- endblock fb_open_graph %}
+
+    <!-- Twitter -->
+    {% block twitter -%}
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="{{ title }}">
+    <meta name="twitter:description" content="{{ desc }}">
+    <meta name="twitter:url" content="{{ perm | safe }}">
+    {%- endblock twitter %}
+  </head>
+
+  <body>
+    {% block body -%}
+    <div class="wrapper">
+      <div class="navbar container">
+        <a id="author-name" class="alignable pull-left" href="{{ config.base_url | safe }}">{{ config.title }}</a>
+        <ul id="navlist" class="alignable pull-right navbar-ul">
+          {%- for x in config.extra.nav -%}
+          <li class="alignable pull-left nav-list"><a href="{{ config.base_url | safe }}{{ x.link | safe }}">{{ x.name }}</a></li>
+          {%- if loop.last == false -%}
+          <li class="alignable pull-left nav-list">&nbsp;/&nbsp;</li>
+          {%- endif -%}
+          {%- endfor %}
+        </ul>
+      </div>
+      <div style="clear:both"></div>
+      <hr>
+      <div class="container content">
+        {% block content %}{{ section.content | safe }}{% endblock content %}
+      </div>
+    </div>
+    {%- endblock body %}
+  </body>
+  <footer>
+  {%- block footer %}
+    <hr />
+    <p style="text-align: center; margin-bottom: 10px">
+    <small>Last Updated: {{ config.build_timestamp | date }}</small>
+    </p>
+  {%- endblock footer %}
+  </footer>

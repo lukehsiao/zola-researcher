@@ -1,0 +1,34 @@
+{% extends "index.html" %}
+
+{% block title -%}
+  {%- set title = page.title -%}
+{%- endblock title %}
+{% block perm -%}
+  {%- set perm = page.permalink -%}
+{%- endblock perm %}
+
+{% block desc -%}
+  {%- set desc = page.description -%}
+{%- endblock dec %}
+
+{% block keywords %}{% if page.extra.keywords -%}
+{{ page.extra.keywords }}
+{%- endif %}{% endblock keywords %}
+
+{% block content %}
+
+<article itemscope itemtype="http://schema.org/BlogPosting">
+    <header class="post__header">
+        <h1 itemprop="headline" class="post__title">
+            {{ page.title }}
+        </h1>
+        <div class="post__meta">
+            <span class="post__time">{{ page.date | date(format="%F") }}</span>
+        </div>
+    </header>
+    <div itemprop="articleBody">
+        {{ page.content | safe }}
+    </div>
+</article>
+
+{% endblock content %}

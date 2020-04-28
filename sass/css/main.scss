@@ -1,0 +1,203 @@
+@import "vars";
+
+/*
+ * Basic
+ */
+
+pre {
+    padding: 1rem;
+    overflow: auto;
+}
+
+.post__title {
+    margin-bottom: 0px;
+}
+
+.post__meta {
+    font-size: 0.90em;
+    color: #909090;
+}
+
+html {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+body {
+    margin: 0;
+    font-family: "Source Sans Pro", sans-serif;
+    height: 100%;
+    font-size: 0.95em;
+    font-display: swap;
+}
+a {
+    text-decoration: none;
+    color: $accent;
+}
+a:hover {
+    text-decoration: underline;
+}
+hr {
+    border: 0;
+    height: 0;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+}
+div.social-icons {
+    padding-top: 0.5em;
+    font-size: 1.5rem;
+}
+div.social-icons > a {
+    padding-right: 0.25rem;
+    padding-left: 0.25rem;
+}
+
+.zola-anchor {
+    font-size: 1.25rem;
+    visibility: hidden;
+    margin-left: 0.25rem;
+    text-decoration: none;
+    border-bottom-color: transparent;
+    cursor: pointer;
+}
+
+h1:hover .zola-anchor,
+h2:hover .zola-anchor,
+h3:hover .zola-anchor,
+h4:hover .zola-anchor,
+h5:hover .zola-anchor,
+h6:hover .zola-anchor {
+    visibility: visible;
+}
+
+.pagination {
+    padding-top: 1rem;
+    margin-bottom: 2rem;
+    clear: both;
+}
+
+.next, .previous {
+    font-weight: 600;
+    font-size: 1rem;
+    transition: transform 0.3s ease-out;
+
+    &:hover {
+        color: $accent;
+    }
+}
+
+.next {
+    float: right;
+    &:hover {
+        transform: translateX(4px);
+    }
+}
+
+.previous {
+    float: left;
+    &:hover {
+        transform: translateX(-4px);
+    }
+}
+
+/*
+ * Navbar
+ */
+
+#author-name {
+    font-size: 30px;
+    color: #272727;
+    display: inline-block;
+}
+.navbar {
+    padding: 20px 0 20px 0;
+}
+.navbar-ul {
+    display: inline-block;
+    margin: 0;
+    padding: 5px 0 5px 0;
+    margin-left: 20px;
+}
+.nav-list {
+    list-style-type: none;
+    margin: 0 5px 0 10px;
+}
+.alignable {
+    display: inline-block;
+}
+.pull-left {
+    @extend .alignable;
+    float: left;
+}
+.pull-right {
+    @extend .alignable;
+    float: right;
+}
+
+/* Divs */
+
+.container {
+    max-width: $max-width;
+    margin: auto;
+}
+.wrapper {
+    min-height: 100%;
+}
+
+/* Institute Image */
+
+#ins-logo {
+    margin: auto;
+    display: block;
+    max-height: 100px;
+    text-align: center;
+}
+
+/* Mobile */
+
+@media (max-width: 800px) {
+    .container {
+        max-width: $med-width;
+    }
+}
+
+@media (max-width: 650px) {
+    .container {
+        max-width: 83%;
+    }
+    .navbar-ul {
+        margin-top: 5px;
+    }
+}
+
+@media (max-width: 500px) {
+    .navbar {
+        text-align: center;
+        padding: 20px 0px 0px 0px;
+    }
+    #author-name {
+        width: 100%;
+        float: none;
+    }
+    #navlist {
+        padding: 10px 0 10px 0;
+        margin: 0;
+        display: block;
+        float: none;
+        text-align: center;
+        width: 100%;
+    }
+    #navlist li.alignable {
+        display: inline-block;
+    }
+    #navlist li.pull-left {
+        float: none;
+    }
+    #navlist li.nav-list {
+        margin: 0;
+    }
+}
+
+@import "typography";
+@import "tables";
+@import "figures";
