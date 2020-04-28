@@ -1,0 +1,51 @@
+@import "vars";
+
+table {
+  margin: 15px 0;
+  border-collapse: collapse;
+  width: auto;
+  padding: 0;
+}
+
+table> :is(thead, tbody)>tr> :is(th, td) {
+  padding: 2px 4px;
+}
+
+table thead {
+  position: sticky;
+  top: 0;
+}
+
+table thead:before {
+  content: '';
+  position: absolute;
+  width: 100%;
+  top: 0;
+  border-top: 2px solid;
+}
+
+table thead:after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  bottom: 0;
+  border-bottom: 1px solid;
+}
+
+table>thead>tr> :is(th, td) {
+  background-color: $bg-2;
+  color: $base;
+}
+
+table>tbody>tr:last-child> :is(th, td) {
+  border-bottom: 2px solid;
+}
+
+table tr {
+  background-color: $bg;
+  margin: 0;
+}
+
+table tr:nth-child(2n) {
+  background-color: $bg-1;
+}

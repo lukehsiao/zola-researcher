@@ -1,0 +1,73 @@
+@import "vars";
+
+@font-face {
+    font-family: 'Berkeley Mono';
+    src: url('../fonts/BerkeleyMonoVariable.woff2') format('woff2');
+    font-stretch: 60 100;
+    font-weight: 100 900;
+    font-feature-settings: calt;
+    font-variant-ligatures: contextual;
+}
+
+@font-face {
+    font-family: 'Atkinson Hyperlegible Next';
+    src: url('../fonts/AtkinsonHyperlegibleNextVF-Variable.woff2') format('woff2');
+    font-weight: 100 900;
+}
+
+.content {
+	a:hover {
+		text-decoration: underline;
+	}
+
+	ol>li {
+		margin: 5px 0 5px 0;
+	}
+
+	ul>li {
+		margin: 5px 0 5px 0;
+	}
+
+	ul {
+		padding: 0 0rem 0 2rem;
+	}
+
+	ol {
+		padding: 0 0rem 0 2rem;
+	}
+
+	p {
+		margin-top: 10px;
+		margin-bottom: 10px;
+	}
+
+	blockquote {
+		border-left: 3px solid $dim;
+		margin: 10px 0 10px 0;
+		padding: 0px 10px 0px 10px;
+		font-style: italic;
+		color: $dim;
+	}
+
+	.profile-picture {
+		height: $image-size;
+		width: $image-size;
+		position: relative;
+		margin: 0 0 0 15px;
+		float: right;
+		border-radius: 50%;
+
+		p & {
+			padding: 0;
+			margin: 0;
+		}
+
+		@media screen and (max-width: $small-width) {
+			float: none;
+
+			img {
+				margin-top: -5px;
+			}
+		}
+	}
+}

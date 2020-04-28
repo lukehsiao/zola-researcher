@@ -1,0 +1,47 @@
+name = "researcher"
+description = "A simple portfolio and blog theme for Zola."
+license = "BlueOak-1.0.0"
+homepage = "https://github.com/lukehsiao/zola-researcher"
+# The minimum version of Zola required
+min_version = "0.21.0"
+# An optional live demo URL
+demo = "https://zola-researcher.pages.dev"
+
+# Any variable there can be overridden in the end user `config.toml`
+# You don't need to prefix variables by the theme name but as this will
+# be merged with user data, some kind of prefix or nesting is preferable
+# Use snake_casing to be consistent with the rest of Zola
+[extra]
+# The Title of the site
+author = "John Doe"
+
+# The filename of the icon to use for your favicon
+favicon = "favicon.ico"
+
+# Links to include in the navigation bar
+nav = [
+  {name = "About", link = ""},
+  {name = "CV", link = "cv.pdf"},
+  {name = "Blog", link = "blog"},
+]
+
+# Your Google Analytics ID
+analytics = ""
+
+# See below
+katex_enable = false
+
+# See below
+instantpage_enable = true
+
+# The theme author info: you!
+[author]
+name = "Luke Hsiao"
+homepage = "https://luke.hsiao.dev"
+
+# If this is porting a theme from another static site engine, provide
+# the info of the original author here
+[original]
+author =  "Ankit Sultana"
+homepage = "http://ankitsultana.com/"
+repo = "https://github.com/ankitsultana/researcher"

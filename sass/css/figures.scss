@@ -1,0 +1,21 @@
+.content {
+  img {
+    text-align: center;
+    margin-bottom: -0.10rem;
+  }
+
+  figure img {
+    max-height: 40em;
+    max-width: 100%;
+    margin: auto;
+    display: block;
+    width: auto;
+    height: auto;
+  }
+
+  figure figcaption {
+    text-align: center;
+    font-style: italic;
+    padding-top: 0.2em;
+  }
+}

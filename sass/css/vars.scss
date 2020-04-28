@@ -1,0 +1,27 @@
+/*
+ * Customization Variables
+ */
+$bg: lab(8% 0 0);
+$bg-1: lab(15% 0 0);
+$bg-2: lab(25% 0 0);
+$dim: lab(50% 0 0);
+$fg: lab(75% 0 0);
+$base: lab(88% 0 0);
+$image-size: 120px;
+
+/* accent colors */
+$red: lab(56% 63 40);
+$green: lab(67% -38 55);
+$yellow: lab(75% 6 68);
+$blue: lab(56% 0 -47);
+$magenta: lab(64% 55 -15);
+$cyan: lab(72% -40 -4);
+$orange: lab(64% 37 50);
+$violet: lab(60% 30 -45);
+
+/*
+ * Build Variables, don't touch
+ */
+$max-width: 750px;
+$med-width: 600px;
+$small-width: 480px;

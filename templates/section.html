@@ -1,0 +1,42 @@
+{% extends "index.html" %}
+
+{% block title -%}
+{%- set title = section.title ~ " | " ~ config.title-%}
+{%- endblock title %}
+{% block perm -%}
+{%- set perm = section.permalink -%}
+{%- endblock perm %}
+
+{% block content %}
+<h1 class="post__title">{{ section.title }}</h1>
+<em>{{ section.description }}</em>
+<div class="posts">
+  {%- for page in paginator.pages %}
+  {%- if not page.extra.hidden %}
+  <article class="post">
+    <h3 itemprop="headline" class="post__title">
+      <a href="{{ page.permalink | safe }}" title="{{ page.description }}">{{ page.title }}</a>
+    </h3>
+    <div class="post__meta">
+      <span>
+        <time datetime="{{ page.date | date(format="%+") | safe }}">
+          {{ page.date | date(format="%F") }}
+        </time>
+      </span>
+      <span>
+        {{ page.reading_time }} min read
+      </span>
+    </div>
+  </article>
+  {%- endif %}
+  {%- endfor %}
+</div>
+<nav class="pagination">
+  {% if paginator.previous %}
+  <a class="previous" href="{{ paginator.previous }}">‹ Previous</a>
+  {% endif %}
+  {% if paginator.next %}
+  <a class="next" href="{{ paginator.next }}">Next ›</a>
+  {% endif %}
+</nav>
+{% endblock content %}

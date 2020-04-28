@@ -1,0 +1,94 @@
+{% extends "index.html" %}
+
+{% block title -%}
+{%- set title = page.title -%}
+{%- endblock title %}
+{% block perm -%}
+{%- set perm = page.permalink -%}
+{%- endblock perm %}
+
+{% block desc -%}
+{%- set desc = page.description -%}
+{%- endblock dec %}
+
+{% block keywords %}{% if page.extra.keywords -%}
+{{ page.extra.keywords }}
+{%- endif %}{% endblock keywords %}
+
+{% block content %}
+
+<article itemscope itemtype="http://schema.org/BlogPosting">
+  <header class="post__header">
+    <h1 itemprop="headline" class="post__title">
+      {{ page.title }}
+    </h1>
+    <div class="post__meta">
+      <span class="post__author">
+        {%- if page.authors -%}
+        {{ page.authors[0] }}
+        {%- elif config.extra.author -%}
+        {{ config.extra.author }}
+        {%- else -%}
+        Unknown
+        {%- endif -%}
+      </span>
+      <span>
+        published
+        <time datetime="{{ page.date | date(format="%+") | safe }}">
+          {{ page.date | date(format="%F") }}
+        </time>
+      </span>
+      <span>
+        {%- if page.updated -%}
+        updated
+        <time datetime="{{ page.updated | date(format="%+") | safe }}">
+          {{ page.updated | date(format="%F") }}
+        </time>
+      </span>
+      {%- endif -%}
+      <span>
+        {{ page.reading_time }} min read
+      </span>
+    </div>
+  </header>
+  {% if page.toc and page.extra.toc -%}
+  <div class="toc">
+    <strong>Contents</strong>
+    <div>
+      <nav id="TableOfContents">
+        <ul>
+          {% for h2 in page.toc %}
+          <li>
+            <a href="{{h2.permalink | safe}}">{{ h2.title }}</a>
+            {% if h2.children %}
+            <ul>
+              {% for h3 in h2.children %}
+              <li>
+                <a href="{{h3.permalink | safe}}">{{ h3.title }}</a>
+                {% if h3.children %}
+                <ul>
+                  {% for h4 in h3.children %}
+                  <li>
+                    <a href="{{h4.permalink | safe}}">{{ h4.title }}</a>
+                  </li>
+                  {% endfor %}
+                </ul>
+                {% endif %}
+              </li>
+              {% endfor %}
+            </ul>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+      </nav>
+    </div>
+  </div>
+  {%- endif %}
+  <div itemprop="articleBody">
+    {{ page.content | safe }}
+  </div>
+</article>
+
+{% endblock content %}
+{% block webring %}{% endblock webring %}
