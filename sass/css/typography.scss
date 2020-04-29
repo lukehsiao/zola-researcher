@@ -34,11 +34,11 @@
         margin-bottom: 10px;
     }
     blockquote {
-        //border: 1px solid black;
-        border-left: 5px solid #333333;
-        margin: 20px 0 20px 0;
-        padding: 2px 8px 2px 8px;
+        border-left: 3px solid $meta;
+        margin: 10px 0 10px 0;
+        padding: 0px 10px 0px 10px;
         font-style: italic;
+        color: $meta;
     }
     .profile-picture {
         height: $image-size;
