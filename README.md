@@ -39,9 +39,6 @@ keywords = "John Doe, blog, posts"
 # The Title of the site
 author = "John Doe"
 
-# The filename of the icon to use for your favicon
-favicon = "favicon.ico"
-
 # Links to include in the navigation bar
 nav = [
   {name = "About", link = ""},
