@@ -16,7 +16,7 @@ highlight_theme = "solarized-light"
 # Whether to build a search index to be used later on by a JavaScript library
 build_search_index = false
 
-generate_rss = true
+generate_feed = true
 
 # Go through every link in all content and check if the links are valid. If a
 # link is invalid (404, 500, etc), the build will error. Link checking can take
