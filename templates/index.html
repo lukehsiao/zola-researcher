@@ -54,8 +54,8 @@
     <link rel="manifest" href="{{ get_url(path="manifest.json") }}">
     {%- endblock favicon %}
     <link rel="canonical" href="{{ perm | safe}}">
-    {% if config.generate_rss -%}
-        <link rel="alternate" type="application/rss+xml" title="RSS" href="{{ get_url(path="rss.xml") | safe }}">
+    {% if config.generate_feed -%}
+    <link rel="alternate" type="application/atom+xml" title="{{ title }}" href="{{ get_url(path="atom.xml") | safe }}">
     {%- endif %}
 
     <!-- Facebook Open Graph -->
