@@ -101,7 +101,7 @@
   {%- block footer %}
     <hr />
     <p style="text-align: center; margin-bottom: 10px">
-    <small>Last Updated: {{ config.build_timestamp | date }}</small>
+    <small>Last Updated: {{ now() | date }}</small>
     </p>
   {%- endblock footer %}
   </footer>
