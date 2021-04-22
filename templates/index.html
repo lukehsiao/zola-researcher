@@ -96,13 +96,13 @@
       </div>
     </div>
     {%- endblock body %}
+    <footer>
+    {%- block footer %}
+      <hr />
+      <p style="text-align: center; margin-bottom: 10px">
+      <small>Last Updated: {{ now(utc=true) | date(timezone="America/Los_Angeles") }}</small>
+      </p>
+    {%- endblock footer %}
+    </footer>
   </body>
-  <footer>
-  {%- block footer %}
-    <hr />
-    <p style="text-align: center; margin-bottom: 10px">
-    <small>Last Updated: {{ now(utc=true) | date(timezone="America/Los_Angeles") }}</small>
-    </p>
-  {%- endblock footer %}
-  </footer>
 </html>
