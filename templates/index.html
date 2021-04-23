@@ -17,8 +17,8 @@
     <meta name="keywords" content="{% block keywords %}{{ section.extra.keywords }}{% endblock keywords %}">
     <meta name="author" content="{{ config.extra.author }}">
     <meta name="description" content="{{ desc }}">
-    <link rel="preconnect" href="https://www.google-analytics.com" crossorigin>
     {% if config.extra.analytics -%}
+    <link rel="preconnect" href="https://www.google-analytics.com" crossorigin>
     <!-- Global site tag (gtag.js) - Google Analytics -->
     <script async src="https://www.googletagmanager.com/gtag/js?id={{ config.extra.analytics }}"></script>
     <script>
