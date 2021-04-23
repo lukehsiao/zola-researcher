@@ -31,7 +31,7 @@
     </script>
     {%- endif %}
     {% if config.extra.instantpage_enable -%}
-    <script src="{{ get_url(path="/js/instantpage.min.js") }}" type="module"></script>
+    <script src="{{ get_url(path="/js/instantpage.min.js") }}" defer></script>
     {%- endif %}
     {% if config.extra.katex_enable %}
     <link rel="stylesheet" href="{{ get_url(path="/css/katex.min.css") }}">
