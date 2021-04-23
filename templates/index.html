@@ -18,7 +18,6 @@
     <meta name="author" content="{{ config.extra.author }}">
     <meta name="description" content="{{ desc }}">
     <link rel="preconnect" href="https://www.google-analytics.com" crossorigin>
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     {% if config.extra.analytics -%}
     <!-- Global site tag (gtag.js) - Google Analytics -->
     <script async src="https://www.googletagmanager.com/gtag/js?id={{ config.extra.analytics }}"></script>
@@ -39,7 +38,6 @@
     <script defer src="{{ get_url(path="/js/mathtex-script-type.min.js") }}"></script>
     <script src="{{ get_url(path="/js/lazysizes.min.js") }}" async></script>
     {% endif %}
-    <link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro&display=swap" rel="stylesheet" type="text/css">
     <link rel="stylesheet" href="{{ get_url(path="/css/main.css") }}">
     {% block favicon -%}
     <meta name="theme-color" content="#ffffff">
