@@ -80,7 +80,7 @@ Your caption here.
 
 ### Fontawesome
 
-This theme includes fontawesome, so that fontawesome icons can be directly used.
+This theme recommends using performant SVG sprites, to only pull in the icons you need.
 
 ### Instant.page
 

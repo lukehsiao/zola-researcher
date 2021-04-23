@@ -61,6 +61,14 @@ div.social-icons > a {
     cursor: pointer;
 }
 
+.icon {
+    overflow: visible; 
+    height: 1em; 
+    width: 1em; 
+    vertical-align: -.125em;
+    fill: $accent; 
+}
+
 h1:hover .zola-anchor,
 h2:hover .zola-anchor,
 h3:hover .zola-anchor,
