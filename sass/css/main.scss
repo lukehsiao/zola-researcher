@@ -25,10 +25,17 @@ html {
 }
 body {
     margin: 0;
-    font-family: "Source Sans Pro", sans-serif;
     background: $bg;
+    font-family: 
+        // Safari for OS X and iOS (San Francisco)
+        -apple-system,
+        // Chrome < 56 for OS X (San Francisco)
+        BlinkMacSystemFont,
+        // Basic web fallback
+        "Open Sans", sans-serif;
     height: 100%;
-    font-size: 0.95em;
+    font-size: 1.0rem;
+    line-height: 1.5;
     font-display: swap;
 }
 a {
