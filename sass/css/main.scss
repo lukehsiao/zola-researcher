@@ -186,7 +186,7 @@ h6:hover .zola-anchor {
     }
 }
 
-@media (max-width: 500px) {
+@media (max-width: $med-width) {
     .navbar {
         text-align: center;
         padding: 20px 0px 0px 0px;
@@ -211,6 +211,25 @@ h6:hover .zola-anchor {
     }
     #navlist li.nav-list {
         margin: 0;
+    }
+}
+
+.meta.row {
+    display: flex;
+    flex-direction: row-reverse;
+    align-items: center;
+}
+.meta.column {
+    width: 50%;
+}
+
+@media (max-width: $small-width) {
+    .meta.row {
+        flex-direction: column;
+    }
+    .meta.column {
+        width: 100%;
+        text-align: center;
     }
 }
 

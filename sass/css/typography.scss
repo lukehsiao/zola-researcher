@@ -52,6 +52,7 @@
             margin: 0;
         }
         @media (max-width: $small-width) {
+            float: none;
             img {
                 margin-top: -5px;
             }
