@@ -1,0 +1,74 @@
+{% if type is defined %}
+{% set t = type | lower %}
+{% else %}
+{% set t = "note" %}
+{% endif %}
+
+{% if t == "note" %}
+{% set aside_class = "aside--note" %}
+{% elif t == "tip" %}
+{% set aside_class = "aside--tip" %}
+{% elif t == "caution" %}
+{% set aside_class = "aside--caution" %}
+{% elif t == "danger" %}
+{% set aside_class = "aside--danger" %}
+{% else %}
+{% set aside_class = "aside--note" %}
+{% endif %}
+
+{% if title is defined and title | length > 0 %}
+{% set aside_title = title %}
+{% else %}
+{% set aside_title = t | title %}
+{% endif %}
+
+<div class="aside {{ aside_class }}">
+  <div class="aside__header" role="heading" aria-level="3">
+    <div class="aside__icon" aria-hidden="true">
+      {% if type == "note" %}
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        class="icon icon-tabler icons-tabler-outline icon-tabler-info-circle">
+        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+        <path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0" />
+        <path d="M12 9h.01" />
+        <path d="M11 12h1v4h1" />
+      </svg>
+      {% elif type == "tip" %}
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        class="icon icon-tabler icons-tabler-outline icon-tabler-rocket">
+        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+        <path d="M4 13a8 8 0 0 1 7 7a6 6 0 0 0 3 -5a9 9 0 0 0 6 -8a3 3 0 0 0 -3 -3a9 9 0 0 0 -8 6a6 6 0 0 0 -5 3" />
+        <path d="M7 14a6 6 0 0 0 -3 6a6 6 0 0 0 6 -3" />
+        <path d="M15 9m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+      </svg>
+      {% elif type == "caution" %}
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+        class="icon icon-tabler icons-tabler-outline icon-tabler-alert-triangle">
+        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+        <path d="M12 9v4" />
+        <path
+          d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0z" />
+        <path d="M12 16h.01" />
+      </svg>
+      {% else %}
+      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"
+        class="icon icon-tabler icons-tabler-filled icon-tabler-radioactive">
+        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+        <path
+          d="M21 11a1 1 0 0 1 1 1a10 10 0 0 1 -5 8.656a1 1 0 0 1 -1.302 -.268l-.064 -.098l-3 -5.19a.995 .995 0 0 1 -.133 -.542l.01 -.11l.023 -.106l.034 -.106l.046 -.1l.056 -.094l.067 -.089a.994 .994 0 0 1 .165 -.155l.098 -.064a2 2 0 0 0 .993 -1.57l.007 -.163a1 1 0 0 1 .883 -.994l.117 -.007h6z" />
+        <path
+          d="M7 3.344a10 10 0 0 1 10 0a1 1 0 0 1 .418 1.262l-.052 .104l-3 5.19l-.064 .098a.994 .994 0 0 1 -.155 .165l-.089 .067a1 1 0 0 1 -.195 .102l-.105 .034l-.107 .022a1.003 1.003 0 0 1 -.547 -.07l-.104 -.052a2 2 0 0 0 -1.842 -.082l-.158 .082a1 1 0 0 1 -1.302 -.268l-.064 -.098l-3 -5.19a1 1 0 0 1 .366 -1.366z" />
+        <path
+          d="M9 11a1 1 0 0 1 .993 .884l.007 .117a2 2 0 0 0 .861 1.645l.237 .152a.994 .994 0 0 1 .165 .155l.067 .089l.056 .095l.045 .099c.014 .036 .026 .07 .035 .106l.022 .107l.011 .11a.994 .994 0 0 1 -.08 .437l-.053 .104l-3 5.19a1 1 0 0 1 -1.366 .366a10 10 0 0 1 -5 -8.656a1 1 0 0 1 .883 -.993l.117 -.007h6z" />
+      </svg>
+      {% endif %}
+    </div>
+
+    <span class="aside__title">{{ aside_title }}</span>
+  </div>
+
+  <div class="aside__body">{{ body | markdown | safe }}</div>
+</div>
