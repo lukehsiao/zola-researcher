@@ -15,7 +15,7 @@ code:not(table code):not(pre code) {
   border: 1px solid;
   padding: 0px 5px;
   margin: 0px 1px;
-  border-color: $dim;
+  border-color: $tx-3;
   font-size: 0.95rem;
 }
 
@@ -31,7 +31,7 @@ pre {
 
 .post__meta {
   font-size: 0.90em;
-  color: $dim;
+  color: $tx-2;
   flex-wrap: wrap;
   display: flex;
 
@@ -70,11 +70,11 @@ body {
   font-family: "Atkinson Hyperlegible Next", sans-serif;
   font-size: 1.0rem;
   line-height: 1.25;
-  color: $fg;
+  color: $tx;
 }
 
 a {
-  text-decoration: underline $bg-2;
+  text-decoration: underline $ui-2;
   color: $blue;
 }
 
@@ -84,7 +84,7 @@ a:hover {
 
 .toc {
   border-radius: 0.5rem;
-  border: 1px solid $bg-2;
+  border: 1px solid $ui-2;
   padding: 1rem 1.5rem;
   margin: 1rem 0rem;
 }
@@ -131,8 +131,7 @@ a:hover {
 hr {
   border: 0;
   height: 0;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  border-bottom: 1px solid $ui-3;
 }
 
 div.social-icons {
@@ -213,7 +212,7 @@ h6:hover .zola-anchor {
 
 #author-name {
   font-size: 1.8rem;
-  color: $base;
+  color: $tx;
 }
 
 .navbar {

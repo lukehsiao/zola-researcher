@@ -33,8 +33,8 @@ table thead:after {
 }
 
 table>thead>tr> :is(th, td) {
-  background-color: $bg-2;
-  color: $base;
+  background-color: $ui;
+  color: $tx;
 }
 
 table>tbody>tr:last-child> :is(th, td) {
@@ -47,5 +47,5 @@ table tr {
 }
 
 table tr:nth-child(2n) {
-  background-color: $bg-1;
+  background-color: $bg-2;
 }

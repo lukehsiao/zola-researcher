@@ -1,23 +1,25 @@
 /*
  * Customization Variables
  */
-$bg: lab(8% 0 0);
-$bg-1: lab(15% 0 0);
-$bg-2: lab(25% 0 0);
-$dim: lab(50% 0 0);
-$fg: lab(75% 0 0);
-$base: lab(88% 0 0);
+$bg: rgb(16, 15, 15);
+$bg-2: rgb(28, 27, 26);
+$ui: rgb(40, 39, 38);
+$ui-2: rgb(52, 51, 49);
+$ui-3: rgb(64, 62, 60);
+$tx-3: rgb(87, 86, 83);
+$tx-2: rgb(135, 133, 128);
+$tx: rgb(206, 205, 195);
 $image-size: 120px;
 
 /* accent colors */
-$red: lab(56% 63 40);
-$green: lab(67% -38 55);
-$yellow: lab(75% 6 68);
-$blue: lab(56% 0 -47);
-$magenta: lab(64% 55 -15);
-$cyan: lab(72% -40 -4);
-$orange: lab(64% 37 50);
-$violet: lab(60% 30 -45);
+$red: rgb(209, 77, 65);
+$green: rgb(135, 154, 57);
+$yellow: rgb(208, 162, 21);
+$blue: rgb(67, 133, 190);
+$magenta: rgb(206, 93, 151);
+$cyan: rgb(58, 169, 159);
+$orange: rgb(218, 112, 44);
+$violet: rgb(139, 126, 200);
 
 /*
  * Build Variables, don't touch
