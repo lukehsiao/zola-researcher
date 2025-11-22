@@ -322,8 +322,12 @@ h6:hover .zola-anchor {
   align-items: center;
 }
 
-.meta.column {
-  width: 50%;
+.meta.columnl {
+  width: 70%;
+}
+
+.meta.columnr {
+  width: 30%;
 }
 
 .footer {
@@ -341,7 +345,16 @@ h6:hover .zola-anchor {
     flex-direction: column;
   }
 
-  .meta.column {
+  .meta.columnr {
+    width: 100%;
+    text-align: center;
+
+    div {
+      padding: 8px 0px;
+    }
+  }
+
+  .meta.columnl {
     width: 100%;
     text-align: center;
 
