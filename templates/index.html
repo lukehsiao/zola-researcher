@@ -76,18 +76,22 @@
   <body>
     {% block body -%}
     <div class="wrapper">
-      <div class="navbar container">
-        <a id="author-name" class="alignable pull-left" href="{{ config.base_url | safe }}">{{ config.title }}</a>
-        <ul id="navlist" class="alignable pull-right navbar-ul">
-          {%- for x in config.extra.nav -%}
-          <li class="alignable pull-left nav-list"><a href="{{ config.base_url | safe }}{{ x.link | safe }}">/{{ x.name | lower }}</a></li>
-          {%- endfor %}
-        </ul>
-      </div>
+      <nav>
+        <div class="navbar container">
+          <a id="author-name" class="alignable pull-left" href="{{ config.base_url | safe }}">{{ config.title }}</a>
+          <ul id="navlist" class="alignable pull-right navbar-ul">
+            {%- for x in config.extra.nav -%}
+            <li class="alignable pull-left nav-list"><a href="{{ config.base_url | safe }}{{ x.link | safe }}">/{{ x.name | lower }}</a></li>
+            {%- endfor %}
+          </ul>
+        </div>
+      </nav>
       <div class="clear"></div>
       <hr>
       <div class="container content">
+        <main>
         {% block content %}{{ section.content | safe }}{% endblock content %}
+        </main>
         {% block webring %}{% endblock webring %}
       </div>
     </div>
