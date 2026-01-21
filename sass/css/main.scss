@@ -345,6 +345,10 @@ h6:hover .zola-anchor {
   text-align: center;
   margin-top: 2rem;
   padding-bottom: 0.5rem;
+
+  p {
+    color: $tx-2;
+  }
 }
 
 .clear {
