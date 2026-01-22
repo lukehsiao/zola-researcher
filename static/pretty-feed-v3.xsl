@@ -80,7 +80,7 @@ Ref: https://github.com/nhoizey/nicolas-hoizey.com/blob/main/src/assets/pretty-a
         </a>
       </h3>
       <small class="gray">
-        Published: <xsl:value-of select="atom:updated" />
+        Published: <xsl:value-of select="atom:published" />
       </small>
     </div>
   </xsl:template>
