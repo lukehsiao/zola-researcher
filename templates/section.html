@@ -4,7 +4,7 @@
 {%- set title = section.title ~ " | " ~ config.title-%}
 {%- endblock title %}
 {% block perm -%}
-{%- set perm = section.permalink -%}
+{%- set perm = current_url | default(value=section.permalink) -%}
 {%- endblock perm %}
 
 {% block content %}
@@ -14,7 +14,7 @@
   {%- for page in paginator.pages %}
   {%- if not page.extra.hidden %}
   <article class="post">
-    <h3 itemprop="headline" class="post__title">
+    <h3 class="post__title">
       <a href="{{ page.permalink | safe }}" title="{{ page.description }}">{{ page.title }}</a>
     </h3>
     <div class="post__meta">

@@ -11,13 +11,22 @@
 {%- set desc = page.description -%}
 {%- endblock desc %}
 
-{% block keywords %}{% if page.extra.keywords -%}
-{{ page.extra.keywords }}
-{%- endif %}{% endblock keywords %}
+{% block ogtype -%}
+{%- set ogtype = "article" -%}
+{%- endblock ogtype %}
+
+{% block og_extra -%}
+{%- if page.date %}
+<meta property="article:published_time" content="{{ page.date | date(format="%+") | safe }}">
+{%- endif %}
+{%- if page.updated %}
+<meta property="article:modified_time" content="{{ page.updated | date(format="%+") | safe }}">
+{%- endif %}
+{%- endblock og_extra %}
 
 {% block content %}
 
-<article itemscope itemtype="http://schema.org/BlogPosting">
+<article itemscope itemtype="https://schema.org/BlogPosting">
   <header class="post__header">
     <h1 itemprop="headline" class="post__title">
       {{ page.title }}

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <meta charset="utf-8">
     {%- block title -%}
       {%- set title = section.title -%}
     {%- endblock title %}
@@ -10,11 +11,12 @@
     {%- block desc -%}
       {%- set desc = section.description -%}
     {%- endblock desc -%}
+    {%- block ogtype -%}
+      {%- set ogtype = "website" -%}
+    {%- endblock ogtype -%}
     <title>{{ title }}</title>
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta http-equiv="content-type" content="text/html; charset=utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="keywords" content="{% block keywords %}{{ section.extra.keywords | default(value="") }}{% endblock keywords %}">
+    <meta name="color-scheme" content="dark">
     <meta name="author" content="{{ config.extra.author }}">
     <meta name="description" content="{{ desc }}">
     {% if config.extra.analytics -%}
@@ -52,23 +54,27 @@
     {%- endblock favicon %}
     <link rel="canonical" href="{{ perm | safe}}">
     {% if config.generate_feeds -%}
-    <link rel="alternate" type="application/atom+xml" title="{{ title }}" href="{{ get_url(path="atom.xml") | safe }}">
+    <link rel="alternate" type="application/atom+xml" title="{{ config.title }}" href="{{ get_url(path="atom.xml") | safe }}">
     {%- endif %}
 
-    <!-- Facebook Open Graph -->
-    {% block fb_open_graph -%}
-    <meta property="og:description" content="{{ desc }}">
+    <!-- Open Graph -->
+    {% block open_graph -%}
+    <meta property="og:site_name" content="{{ config.title }}">
+    <meta property="og:type" content="{{ ogtype }}">
     <meta property="og:title" content="{{ title }}">
+    <meta property="og:description" content="{{ desc }}">
     <meta property="og:url" content="{{ perm | safe }}">
-    <meta property="og:type" content="article">
-    {%- endblock fb_open_graph %}
+    {%- if config.extra.og_image %}
+    <meta property="og:image" content="{{ get_url(path=config.extra.og_image) | safe }}">
+    {%- endif %}
+    {% block og_extra %}{% endblock og_extra %}
+    {%- endblock open_graph %}
 
     <!-- Twitter -->
     {% block twitter -%}
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="{{ title }}">
     <meta name="twitter:description" content="{{ desc }}">
-    <meta name="twitter:url" content="{{ perm | safe }}">
     {%- endblock twitter %}
     {% block extra_head %}{% endblock extra_head %}
   </head>
