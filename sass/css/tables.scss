@@ -49,3 +49,13 @@ table tr {
 table tr:nth-child(2n) {
   background-color: $bg-2;
 }
+
+/* On narrow screens, wide tables scroll in place instead of widening the page
+ * and pushing all other content past the right edge. */
+@media screen and (max-width: 650px) {
+  table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}

@@ -1,9 +1,7 @@
 +++
 title = "Ninth post"
 date = 2018-07-09
-
-[extra]
-author = "Test Author"
+authors = ["Jane Smith"]
 +++
 Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
 incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis
@@ -14,8 +12,8 @@ in culpa qui officia deserunt mollit anim id est laborum.
 
 <!-- more -->
 
-{% figure(link="https://en.wikipedia.org/wiki/Cable_lacing#/media/File:Cable_lacing_close-up.jpg", src="https://upload.wikimedia.org/wikipedia/commons/9/9c/Cable_lacing_close-up.jpg", alt="Laced wiring harness") %}
-Cable lacing example from Wikipedia.
+{% figure(link="https://github.com/lukehsiao/zola-researcher", src="/blog/placeholder.svg", alt="A placeholder image", bg="transparent") %}
+A caption set with the `figure` shortcode.
 {% end %}
 
 {% katex(block=true) %}

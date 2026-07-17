@@ -1,10 +1,19 @@
 @import "vars";
 
 /*
+ * Font stacks are custom properties so a site can override them from its own
+ * stylesheet without forking the theme's sass.
+ */
+:root {
+  --font-body: "Atkinson Hyperlegible Next", sans-serif;
+  --font-mono: ui-monospace, Iosevka, Hack, Menlo, Consolas, Monaco, "Liberation Mono", "Lucida Console", monospace;
+}
+
+/*
  * Basic
  */
 code {
-  font-family: "Berkeley Mono", Iosevka, Hack, Menlo, Consolas, Monaco, Liberation Mono, Lucida Console, monospace;
+  font-family: var(--font-mono);
   font-size: 0.95rem;
   display: inline-block;
   line-height: 1.2;
@@ -67,7 +76,7 @@ html {
 body {
   margin: 0;
   background: $bg;
-  font-family: "Atkinson Hyperlegible Next", sans-serif;
+  font-family: var(--font-body);
   font-size: 1.0rem;
   line-height: 1.25;
   color: $tx;

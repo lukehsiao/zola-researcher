@@ -57,7 +57,7 @@ fn main() {
 
 ## An image
 
-![a cat](https://i.imgur.com/t6nPdY8.jpg "A cat")
+![a placeholder image](/blog/placeholder.svg "A placeholder image")
 
 ## An iframe
 

@@ -150,11 +150,11 @@ include_content = true
 [extra]
 author = "John Doe"
 nav = [
-  {name = "cv", link = "cv.pdf"},
-  {name = "blog", link = "blog"},
+  {name = "about", link = ""},
+  {name = "blog", link = "blog/"},
 ]
 analytics = ""
-katex_enable = false
+katex_enable = true
 instantpage_enable = true
 fontawesome = false
 

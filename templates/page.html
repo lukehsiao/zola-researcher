@@ -9,7 +9,7 @@
 
 {% block desc -%}
 {%- set desc = page.description -%}
-{%- endblock dec %}
+{%- endblock desc %}
 
 {% block keywords %}{% if page.extra.keywords -%}
 {{ page.extra.keywords }}
@@ -38,14 +38,14 @@
           {{ page.date | date(format="%F") }}
         </time>
       </span>
+      {%- if page.updated %}
       <span>
-        {%- if page.updated -%}
         updated
         <time datetime="{{ page.updated | date(format="%+") | safe }}">
           {{ page.updated | date(format="%F") }}
         </time>
       </span>
-      {%- endif -%}
+      {%- endif %}
       <span>
         {{ page.reading_time }} min read
       </span>

@@ -1,7 +1,7 @@
 +++
 paginate_by = 8
 sort_by = "date"
-title = "Blog Posts | John Doe"
+title = "Blog"
 description = "A collection of my blog posts."
 insert_anchor_links = "right"
 

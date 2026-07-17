@@ -63,8 +63,25 @@ fn main() {
 
 ## An image
 
-![a cat](https://placekitten.com/200/300?image=4 "A cat photo taken by Energetic
-Spirit (CC BY-SA 2.0)")
+![a placeholder image](/blog/placeholder.svg "A placeholder image")
+
+## Asides
+
+{% aside(type="note") %}
+A note aside, for calling out extra context.
+{% end %}
+
+{% aside(type="tip", title="Pro tip") %}
+A tip aside with a custom title.
+{% end %}
+
+{% aside(type="caution") %}
+A caution aside, for things that might surprise you.
+{% end %}
+
+{% aside(type="danger") %}
+A danger aside, for things that will ruin your day.
+{% end %}
 
 ## An iframe
 
