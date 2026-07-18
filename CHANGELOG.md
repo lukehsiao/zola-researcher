@@ -6,6 +6,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0]
+
+A big polish pass on the theme.
+It is now "usable" in a real sense.
+
 ### Added
 - Bundle the Atkinson Hyperlegible Next variable font (SIL OFL 1.1) so the theme renders as designed without files from a parent site.
 - `custom_css` config option and `extra_head` template block for site-level customization.
