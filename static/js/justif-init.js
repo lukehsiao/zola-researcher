@@ -31,8 +31,6 @@ function widestUnbreakableTokenPx(code) {
   }
   return widest;
 }
-let controller = null;
-
 function enhance() {
   for (const el of candidates) {
     for (const code of el.querySelectorAll("code")) {
@@ -56,29 +54,19 @@ function enhance() {
   // lines without those gaps. spacing is replaced wholesale by justif, so every
   // field is set here rather than merged.
   //
-  // observeResize is off. Otherwise justif's ResizeObserver reacts to width
-  // changes, including the sub-pixel wobble its own re-render induces inside the
-  // flex webring, and re-justifies — a feedback loop Gecko (Firefox) does not
-  // damp the way Blink does. It shows as jitter that grows toward each line's
-  // end, since justified word positions accumulate from the pinned line start.
-  controller = justify(prose, {
+  // observeResize stays on (justif's default): it re-justifies before paint on
+  // width changes, lower latency than any manual resize handler. Block prose
+  // can't feed back (its width is the container's, not its content's). A flex
+  // item whose width tracks its content could, though: justif's re-render would
+  // change the width and retrigger the observer, a loop Gecko does not damp
+  // (jitter growing toward each line's end). Any such element must set
+  // `contain: inline-size` to decouple its width from content — the site does
+  // this for the webring summaries.
+  justify(prose, {
     hyphenate: hyphenateEnUS,
     spacing: { stretch: 0.25, shrink: 1 / 3, pull: 0.7, boundaryShrink: 1 },
     tracking: { max: 0.04, shrink: 0.03 },
-    observeResize: false,
   });
 }
 
 enhance();
-
-// With the observer off, re-measure on real viewport changes instead. These
-// come from the window, never from justif's own layout, so they cannot loop.
-let resizeTimer;
-window.addEventListener(
-  "resize",
-  () => {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => controller?.refresh(), 150);
-  },
-  { passive: true },
-);
