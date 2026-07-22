@@ -93,6 +93,9 @@ analytics = ""
 # KaTeX math rendering; see below.
 katex_enable = false
 
+# Publication-grade text justification; see below.
+justif_enable = false
+
 # instant.page prefetching; see below.
 instantpage_enable = true
 
@@ -144,6 +147,17 @@ With the extension enabled, use the `katex` shortcode:
 ```
 
 `block=true` typesets a display block like `$$...$$` in LaTeX; omit it for inline math.
+
+### Justified text
+
+Publication-grade justification uses [justif](https://github.com/lyallcooper/justif), enabled by setting `justif_enable = true` in `[extra]`.
+All justif assets are served locally: `static/js/justif` is the unmodified `dist/` directory of the [justif npm package](https://www.npmjs.com/package/justif); to upgrade, replace it with a newer package's `dist/`.
+
+With the extension enabled, the theme sets `<html lang="en-US" class="justif">`, justifies the prose inside `main`, and runs `static/js/justif-init.js`.
+That init module calls justif's JavaScript API so word-space stretch is capped (the `auto.js` drop-in exposes no spacing options); it scans the whole document and enhances only elements that CSS computes to `text-align: justify`, so centered captions and the left-aligned table of contents are left alone. A site can justify more by adding its own rules (its own stylesheet decides what is justified, wherever it lives).
+Elements whose inline code holds an unbreakable token wider than a third of the measure (a long file path, say) are left ragged instead: justif cannot break inside such tokens, and justifying around them forces loose word spacing.
+justif applies the TeX line-breaking algorithm with English hyphenation to paragraphs it can measure, and native `text-align: justify` remains the fallback for skipped paragraphs and visitors without JavaScript.
+The init hyphenates in American English; edit `justif-init.js` to add other languages.
 
 ### Figure shortcode
 

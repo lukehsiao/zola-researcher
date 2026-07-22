@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Support [`justif`](https://github.com/lyallcooper/justif) justification.
+
 ## [0.2.0]
 
 A big polish pass on the theme.

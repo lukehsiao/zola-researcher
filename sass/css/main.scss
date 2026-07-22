@@ -17,13 +17,15 @@ code {
   font-size: 0.95rem;
   display: inline-block;
   line-height: 1.2;
+  /* Keeps justif from hyphenating identifiers; a synthetic "-" misreads in code. */
+  hyphens: none;
 }
 
 code:not(table code):not(pre code) {
+  display: inline;
   border-radius: 0.3rem;
   border: 1px solid;
   padding: 0px 5px;
-  margin: 0px 1px;
   border-color: $tx-3;
   font-size: 0.95rem;
 }
@@ -101,6 +103,40 @@ a:hover {
 
 .toc ul {
   margin: 0;
+}
+
+/*
+ * Prose justification for the justif extension. The class is set on <html>
+ * when justif_enable is on; native justification remains the fallback for
+ * paragraphs the script skips and for visitors without JavaScript.
+ */
+.justif main {
+  p, li, dd, blockquote {
+    text-align: justify;
+  }
+
+  /*
+   * Keep off-screen paragraphs out of layout work on long pages. justif holds
+   * their placeholder heights exact, so scrollbars and anchors stay stable. We
+   * load the script without blocking="render", so a paragraph may repaint from
+   * native to justif layout; that visible change is the cost of faster first
+   * paint.
+   *
+   * content-visibility implies paint containment, which clips to the padding
+   * box: the top border of a first-line inline-code chip sits ~2px above it,
+   * and justif hangs punctuation a hair into the margins. overflow-clip-margin
+   * widens the paint clip enough to keep both, at no layout cost.
+   */
+  p {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 8em;
+    overflow-clip-margin: 0.3em;
+  }
+
+  /* TOC entries are navigation, not prose; keep them ragged. */
+  .toc li {
+    text-align: left;
+  }
 }
 
 .button {

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-US"{% if config.extra.justif_enable %} class="justif"{% endif %}>
   <head>
     <meta charset="utf-8">
     {%- block title -%}
@@ -33,6 +33,9 @@
     {%- endif %}
     {% if config.extra.instantpage_enable -%}
     <script src="{{ get_url(path="/js/instantpage.min.js") }}" defer></script>
+    {%- endif %}
+    {% if config.extra.justif_enable -%}
+    <script type="module" src="{{ get_url(path="/js/justif-init.js") }}"></script>
     {%- endif %}
     {% if config.extra.katex_enable %}
     <link rel="stylesheet" href="{{ get_url(path="/css/katex.min.css") }}">
