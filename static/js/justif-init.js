@@ -16,8 +16,8 @@ const candidates = document.querySelectorAll(
 // and fitting it forces the words that share its lines to stretch. Once such
 // a token passes a third of the measure that stretch is glaring, and no
 // spacing budget can absorb it, so those elements read better ragged.
-// Measured with canvas: cheap, and close enough for a threshold even if the
-// mono webfont has not finished loading.
+// Measured with canvas after fonts settle (enhancement is gated on
+// document.fonts.ready below), so the widths match what justif measures.
 const ctx = document.createElement("canvas").getContext("2d");
 function widestUnbreakableTokenPx(code) {
   const cs = getComputedStyle(code);
@@ -31,29 +31,42 @@ function widestUnbreakableTokenPx(code) {
   }
   return widest;
 }
-for (const el of candidates) {
-  for (const code of el.querySelectorAll("code")) {
-    if (widestUnbreakableTokenPx(code) > el.clientWidth / 3) {
-      el.style.textAlign = "left";
-      break;
+// Lay out only after fonts settle. justif measures the current font and
+// re-justifies when the webfont arrives; running before it loads means two
+// passes, and Gecko (e.g. Firefox Focus) paints the re-justify as a flicker.
+// document.fonts.ready resolves on load or failure; the timeout is a failsafe
+// so text still justifies if it somehow never settles. (The site font is
+// preloaded, so the wait is short.)
+function enhance() {
+  for (const el of candidates) {
+    for (const code of el.querySelectorAll("code")) {
+      if (widestUnbreakableTokenPx(code) > el.clientWidth / 3) {
+        el.style.textAlign = "left";
+        break;
+      }
     }
   }
+
+  const prose = [...candidates].filter((el) => {
+    const align = getComputedStyle(el).textAlign;
+    return align === "justify" || align === "justify-all";
+  });
+
+  // The stretch default of 0.5 lets a word space grow to 150% of its natural
+  // width, which opens visible gaps when a long unbreakable token such as inline
+  // code shares a line. Halving the stretch budget keeps spacing even; letting
+  // spaces shrink fully where the body font meets inline code (boundaryShrink)
+  // and allowing slightly more letter-spacing (tracking) give justif room to fit
+  // lines without those gaps. spacing is replaced wholesale by justif, so every
+  // field is set here rather than merged.
+  justify(prose, {
+    hyphenate: hyphenateEnUS,
+    spacing: { stretch: 0.25, shrink: 1 / 3, pull: 0.7, boundaryShrink: 1 },
+    tracking: { max: 0.04, shrink: 0.03 },
+  });
 }
 
-const prose = [...candidates].filter((el) => {
-  const align = getComputedStyle(el).textAlign;
-  return align === "justify" || align === "justify-all";
-});
-
-// The stretch default of 0.5 lets a word space grow to 150% of its natural
-// width, which opens visible gaps when a long unbreakable token such as inline
-// code shares a line. Halving the stretch budget keeps spacing even; letting
-// spaces shrink fully where the body font meets inline code (boundaryShrink)
-// and allowing slightly more letter-spacing (tracking) give justif room to fit
-// lines without those gaps. spacing is replaced wholesale by justif, so every
-// field is set here rather than merged.
-justify(prose, {
-  hyphenate: hyphenateEnUS,
-  spacing: { stretch: 0.25, shrink: 1 / 3, pull: 0.7, boundaryShrink: 1 },
-  tracking: { max: 0.04, shrink: 0.03 },
-});
+Promise.race([
+  document.fonts.ready,
+  new Promise((resolve) => setTimeout(resolve, 2000)),
+]).then(enhance);
