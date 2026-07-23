@@ -937,6 +937,9 @@ function writeParagraph(p, segments, lineWidths, physicalFitLines) {
         hyphen.style.marginInlineEnd = prevEntry.marginEndEl.style.marginInlineEnd;
         prevEntry.marginEndEl.style.marginInlineEnd = "";
       }
+      if (prevEntry?.seg?.hyphenLetterSpacingPx !== void 0) {
+        hyphen.style.letterSpacing = px(prevEntry.seg.hyphenLetterSpacingPx);
+      }
       prevContainer.append(hyphen);
       entries.push({
         el: hyphen,
@@ -1094,7 +1097,7 @@ function measureCorrections(pending) {
         const textEntries = entries.filter(entry => entry.seg !== null);
         const endText = textEntries[textEntries.length - 1];
         const rightHang = endText?.seg.rightHangPx ?? 0;
-        const physicalEndHang = endText?.seg.physicalEndHangPx ?? 0;
+        const physicalEndHang = (endText?.seg.physicalEndHangPx ?? 0) + (endText?.seg.hyphenEndHangPx ?? 0);
         const deliberateOverflow = endText?.seg.overflowPx ?? 0;
         const besideFloat = li < physicalFitLines;
         const physicalLayout = layout - ownMargins;
@@ -1471,9 +1474,16 @@ function buildRenderSegments(scan, runsMetrics, para, lines) {
           break;
         }
       }
-      const physicalEndHang = lineIndex < (scan.floatIntrusion?.lines ?? 0) && !line.hyphenated && endBox?.paintedEnd !== true && line.rightHang > 0 && last.text.trimEnd().length > 0 ? line.rightHang : 0;
+      const besideFloat = lineIndex < (scan.floatIntrusion?.lines ?? 0);
+      const physicalEndHang = besideFloat && !line.hyphenated && endBox?.paintedEnd !== true && line.rightHang > 0 && last.text.trimEnd().length > 0 ? line.rightHang : 0;
       if (physicalEndHang > 0) last.physicalEndHangPx = physicalEndHang;
-      last.marginEndPx = -(line.rightHang - physicalEndHang + line.overflowPx + WRAP_SAFETY_PAD_PX);
+      const hyphenEndHang = besideFloat && line.hyphenated && line.rightHang > 0 && endBox !== void 0 ? line.rightHang : 0;
+      if (hyphenEndHang > 0) {
+        last.hyphenEndHangPx = hyphenEndHang;
+        const endSpec = scan.specs[scan.runs[endBox.run].spec];
+        last.hyphenLetterSpacingPx = endSpec.letterSpacingPx - hyphenEndHang;
+      }
+      last.marginEndPx = -(line.rightHang - physicalEndHang - hyphenEndHang + line.overflowPx + WRAP_SAFETY_PAD_PX);
       last.rightHangPx = line.rightHang;
       last.overflowPx = line.overflowPx;
       if (endBox?.type === ItemType.Box && endBox.paintedEnd === true) {
@@ -1792,6 +1802,10 @@ function justify(targets, options) {
       disableTextAutosizing(p);
       p.style.textAlign = state.scan.direction === "rtl" ? "right" : "left";
       p.style.setProperty("hanging-punctuation", "none");
+      if (state.scan.specs[state.scan.baseSpec].hyphens === "auto") {
+        p.style.setProperty("hyphens", "manual");
+        p.style.setProperty("-webkit-hyphens", "manual");
+      }
     }
     if (state.scan.pinIntrinsicSize && state.scan.lineHeightPx !== null) {
       p.style.containIntrinsicBlockSize = `auto ${Math.round(lines.length * state.scan.lineHeightPx * 1e3) / 1e3}px`;
