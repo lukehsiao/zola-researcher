@@ -64,6 +64,14 @@ function enhance() {
   // this for the webring summaries.
   justify(prose, {
     hyphenate: hyphenateEnUS,
+    // The 0.33 default leaves multi-line paragraphs whose last line already
+    // clears a third of the measure in native CSS justification. The browser
+    // cannot hyphenate or rebalance there, so a line of short words stretches
+    // its spaces to several times their natural width. Setting 1 makes justif
+    // set every paragraph it can afford as a full rectangle, taking those
+    // paragraphs over and spacing them evenly; its own last-line stretch is
+    // capped near twice natural, well under the browser's uneven gaps.
+    lastLineMinWidth: 1,
     spacing: { stretch: 0.25, shrink: 1 / 3, pull: 0.7, boundaryShrink: 1 },
     tracking: { max: 0.04, shrink: 0.03 },
   });
