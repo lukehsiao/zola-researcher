@@ -1416,7 +1416,13 @@ function expansionGainAt(para, start, end, stretchPct, limitPct) {
   }
   return gain;
 }
-function layoutLines(para, breaks, widths, opts) {
+function layoutLines(para, breaks, widths, opts, priorLastLineFit) {
+  if (priorLastLineFit === void 0) {
+    priorLastLineFit = {
+      sum: 0,
+      count: 0
+    };
+  }
   const items = para.items,
     cumW = para.cumW,
     cumY = para.cumY,
@@ -1476,10 +1482,10 @@ function layoutLines(para, breaks, widths, opts) {
     } else if (delta > 0 && Yfil > 0) {
       const glueOnly = Yg - Yt;
       let fitTarget = 0;
-      if (opts.lastLineFit > 0 && lines.length > 0) {
-        let sum = 0;
+      if (opts.lastLineFit > 0 && priorLastLineFit.count + lines.length > 0) {
+        let sum = priorLastLineFit.sum;
         for (const l of lines) sum += l.glueRatio;
-        fitTarget = opts.lastLineFit * (sum / lines.length);
+        fitTarget = opts.lastLineFit * (sum / (priorLastLineFit.count + lines.length));
       }
       let floored = false;
       const minWidth = breaks.endingMinWidth ?? opts.lastLineMinWidth;
@@ -3028,5 +3034,5 @@ function fontProtrusion(familyList) {
   return id === void 0 ? void 0 : TABLES[id];
 }
 export { CJK_CHAR, Fitness, INF_BAD, INF_PENALTY, ItemType, UNDERFULL_RATIO, badness, breakParagraph, breakRp, buildItems, cjkBreakAllowed, composeProtrusion, defaultBreakOptions, defaultBuildOptions, demerits, demeritsUncapped, fitness, fontProtrusion, graphemes, hangingPunctuation, kinsokuNotAtLineEnd, kinsokuNotAtLineStart, latinProtrusion, layoutLines, lineText, lineWidthAt, maxEndingStretch, protrusionCodes, textMakesBox, withSums };
-//# sourceMappingURL=chunk-RCPRSMB4.js.map
-//# sourceMappingURL=chunk-RCPRSMB4.js.map
+//# sourceMappingURL=chunk-GKFOJ2MH.js.map
+//# sourceMappingURL=chunk-GKFOJ2MH.js.map

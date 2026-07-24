@@ -1,5 +1,5 @@
-import { composeProtrusion, latinProtrusion, defaultBuildOptions, breakParagraph, layoutLines, defaultBreakOptions, ItemType, CJK_CHAR, graphemes, fontProtrusion, buildItems, textMakesBox } from './chunk-RCPRSMB4.js';
-export { composeProtrusion, fontProtrusion, hangingPunctuation, kinsokuNotAtLineEnd, kinsokuNotAtLineStart, latinProtrusion } from './chunk-RCPRSMB4.js';
+import { composeProtrusion, latinProtrusion, defaultBuildOptions, breakParagraph, layoutLines, defaultBreakOptions, ItemType, CJK_CHAR, graphemes, fontProtrusion, textMakesBox, buildItems } from './chunk-GKFOJ2MH.js';
+export { composeProtrusion, fontProtrusion, hangingPunctuation, kinsokuNotAtLineEnd, kinsokuNotAtLineStart, latinProtrusion } from './chunk-GKFOJ2MH.js';
 
 // src/dom/measure.ts
 function fontSpecOf(style) {
@@ -386,8 +386,40 @@ function createWidthObserver(onWidths) {
   };
 }
 
+// src/dom/geometry.ts
+var FRAGMENT_WIDTH_TOLERANCE_PX = 0.5;
+function fragmentBoxesOf(el, style) {
+  const view = el.ownerDocument.defaultView;
+  if (view === null) return {
+    ok: false,
+    reason: "zero content width"
+  };
+  const cs = style ?? view.getComputedStyle(el);
+  const rects = [...el.getClientRects()].filter(rect => rect.width > 0);
+  if (rects.length === 0) return {
+    ok: false,
+    reason: "zero content width"
+  };
+  const borderBoxWidth = rects[0].width;
+  if (rects.some(rect => Math.abs(rect.width - borderBoxWidth) > FRAGMENT_WIDTH_TOLERANCE_PX)) {
+    return {
+      ok: false,
+      reason: "fragment boxes have unequal widths"
+    };
+  }
+  const contentWidth = borderBoxWidth - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0) - (parseFloat(cs.borderLeftWidth) || 0) - (parseFloat(cs.borderRightWidth) || 0);
+  return contentWidth > 0 ? {
+    ok: true,
+    rects,
+    contentWidth
+  } : {
+    ok: false,
+    reason: "zero content width"
+  };
+}
+
 // src/dom/read.ts
-var REJECT_TAGS = /* @__PURE__ */new Set(["BR", "WBR", "IMG", "PICTURE", "VIDEO", "AUDIO", "CANVAS", "IFRAME", "OBJECT", "EMBED", "INPUT", "BUTTON", "SELECT", "TEXTAREA", "MATH", "TABLE", "HR", "SVG"]);
+var REJECT_TAGS = /* @__PURE__ */new Set(["WBR", "IMG", "PICTURE", "VIDEO", "AUDIO", "CANVAS", "IFRAME", "OBJECT", "EMBED", "INPUT", "BUTTON", "SELECT", "TEXTAREA", "MATH", "TABLE", "HR", "SVG"]);
 var UNSUPPORTED_SCRIPTS = /[\u0E00-\u0EFF]/;
 var BIDI_CONTROLS = /[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/;
 var STRONG_RTL = /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF\u{10800}-\u{10FFF}\u{1E800}-\u{1EFFF}]/u;
@@ -620,7 +652,7 @@ function floatedFirstLetter(p, paragraphStyle, style, floatSide, text, span) {
     style: firstLetterStyle(style)
   };
 }
-function floatDetailsOf(p, text, paragraphStyle) {
+function floatDetailsOf(p, text, paragraphStyle, fragmentCount) {
   const view = p.ownerDocument.defaultView;
   if (view === null) return null;
   let style;
@@ -633,6 +665,15 @@ function floatDetailsOf(p, text, paragraphStyle) {
     return nonFloatedFirstLetterChangesLayout(p, paragraphStyle ?? view.getComputedStyle(p), style, text) ? "layout-changing non-floated ::first-letter" : null;
   }
   const cs = paragraphStyle ?? view.getComputedStyle(p);
+  let liveFragmentCount = fragmentCount;
+  if (liveFragmentCount === void 0) {
+    const fragments = fragmentBoxesOf(p, cs);
+    if (!fragments.ok) return fragments.reason;
+    liveFragmentCount = fragments.rects.length;
+  }
+  if (liveFragmentCount > 1) {
+    return "fragmented paragraph with floated ::first-letter";
+  }
   const direction = cs.direction === "rtl" ? "rtl" : "ltr";
   const floatSide = physicalFloatSide(style.float, direction);
   if (floatSide === null) return `unsupported ::first-letter float: ${style.float}`;
@@ -685,6 +726,7 @@ function readParagraph(p) {
   };
   const baseSpec = indexSpec(cs);
   const runs = [];
+  const hardBreaks = [];
   let skip = null;
   let nextAtomicKey = 0;
   const walk = (node, chain, spec, atomicKey, floatInnerStyle) => {
@@ -710,7 +752,26 @@ function readParagraph(p) {
       } else if (child.nodeType === 1) {
         adjacentTextRun = null;
         const el = child;
-        if (REJECT_TAGS.has(el.tagName.toUpperCase())) {
+        const tag = el.tagName.toUpperCase();
+        if (tag === "BR") {
+          const elStyle2 = view.getComputedStyle(el);
+          if (elStyle2.display === "none") continue;
+          if (elStyle2.clear !== "none") {
+            skip = `<br> with clear: ${elStyle2.clear}`;
+            return;
+          }
+          if (elStyle2.display !== "inline" || elStyle2.float !== "none" || elStyle2.position !== "static" && elStyle2.position !== "relative") {
+            skip = "non-inline-flow <br> (display/float/position)";
+            return;
+          }
+          hardBreaks.push({
+            source: el,
+            ancestors: chain,
+            afterRun: runs.length
+          });
+          continue;
+        }
+        if (REJECT_TAGS.has(tag)) {
           skip = `<${el.tagName.toLowerCase()}> content`;
           return;
         }
@@ -794,12 +855,14 @@ function readParagraph(p) {
   };
   walk(p, [], baseSpec, void 0, []);
   if (skip !== null) return skip;
-  if (runs.length === 0) return "no text content";
+  if (runs.length === 0 && hardBreaks.length === 0) return "no text content";
   const text = runs.map(r => r.text).join("");
-  if (!textSupported(text, direction)) {
+  if (text.length > 0 && !textSupported(text, direction)) {
     return "unsupported text (bidi controls, mixed direction, or a script without break support)";
   }
-  const floatDetails = floatDetailsOf(p, text, cs);
+  const fragments = fragmentBoxesOf(p, cs);
+  if (!fragments.ok) return fragments.reason;
+  const floatDetails = floatDetailsOf(p, text, cs, fragments.rects.length);
   if (typeof floatDetails === "string") return floatDetails;
   const floatIntrusion = floatDetails?.intrusion ?? null;
   if (floatDetails !== null) {
@@ -818,8 +881,7 @@ function readParagraph(p) {
       offset = runEnd;
     }
   }
-  const contentWidth = contentWidthOf(p);
-  if (contentWidth <= 0) return "zero content width";
+  const contentWidth = fragments.contentWidth;
   let textIndent = parseFloat(cs.textIndent) || 0;
   const textIndentPct = cs.textIndent.endsWith("%") ? textIndent / 100 : null;
   if (textIndentPct !== null) textIndent = textIndentPct * contentWidth;
@@ -829,6 +891,7 @@ function readParagraph(p) {
   const pinIntrinsicSize = (styles.contentVisibility ?? "") === "auto" || cis !== "" && cis !== "none";
   return {
     runs,
+    hardBreaks,
     specs,
     baseSpec,
     contentWidth,
@@ -843,9 +906,25 @@ function readParagraph(p) {
 }
 function contentWidthOf(p) {
   const view = p.ownerDocument.defaultView;
-  if (view === null) return 0;
+  if (view === null) return "zero content width";
   const cs = view.getComputedStyle(p);
-  return p.getBoundingClientRect().width - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0) - (parseFloat(cs.borderLeftWidth) || 0) - (parseFloat(cs.borderRightWidth) || 0);
+  const fragments = fragmentBoxesOf(p, cs);
+  return fragments.ok ? fragments.contentWidth : fragments.reason;
+}
+
+// src/dom/whitespace.ts
+function leadingCollapsibleSpaces(text) {
+  let count = 0;
+  while (count < text.length && text.charCodeAt(count) === 32) count++;
+  return count;
+}
+function trailingCollapsibleSpaces(text) {
+  let count = 0;
+  while (count < text.length && text.charCodeAt(text.length - count - 1) === 32) count++;
+  return count;
+}
+function endWithoutCollapsibleSpaces(text) {
+  return text.length - trailingCollapsibleSpaces(text);
 }
 
 // src/dom/write.ts
@@ -884,7 +963,7 @@ function ensureStylesheet(root) {
   (isDoc ? doc.head : root).append(style);
   styledRoots.add(root);
 }
-function writeParagraph(p, segments, lineWidths, physicalFitLines) {
+function writeParagraph(p, contents, lineWidths, physicalFitLines) {
   if (physicalFitLines === void 0) {
     physicalFitLines = 0;
   }
@@ -921,12 +1000,24 @@ function writeParagraph(p, segments, lineWidths, physicalFitLines) {
   };
   let prevContainer = fragment;
   let floatSource = null;
+  const segments = contents.filter(content => !("kind" in content));
   const floatBaseStyle = new Map(segments.find(segment => segment.floatedStyle !== void 0)?.floatedStyle ?? []);
   const floatInnerProperties = new Set(segments.flatMap(segment => (segment.floatedInnerStyle ?? []).map(_ref4 => {
     let property = _ref4[0];
     return property;
   })));
-  for (const segment of segments) {
+  let lastWasHardBreak = false;
+  for (const content of contents) {
+    if ("kind" in content) {
+      const container2 = containerFor(content.ancestors);
+      container2.append(content.source.cloneNode(false));
+      prevContainer = container2;
+      lineElements.push([]);
+      lastWasHardBreak = true;
+      continue;
+    }
+    const segment = content;
+    lastWasHardBreak = false;
     if (segment.joint === "hyphen") {
       const hyphen = doc.createElement("span");
       hyphen.className = "justif-hyphen";
@@ -1035,6 +1126,7 @@ function writeParagraph(p, segments, lineWidths, physicalFitLines) {
       paintEndEl
     });
   }
+  if (lastWasHardBreak) lineElements.pop();
   p.replaceChildren(fragment);
   return {
     doc,
@@ -1044,9 +1136,26 @@ function writeParagraph(p, segments, lineWidths, physicalFitLines) {
     physicalFitLines
   };
 }
+function fragmentForLine(rects, lineRect, rtl) {
+  const x = rtl ? lineRect.right : lineRect.left;
+  const y = lineRect.top + lineRect.height / 2;
+  let best = rects[0];
+  let bestDistance = Infinity;
+  for (const rect of rects) {
+    const dx = x < rect.left ? rect.left - x : x > rect.right ? x - rect.right : 0;
+    const dy = y < rect.top ? rect.top - y : y > rect.bottom ? y - rect.bottom : 0;
+    const distance = dx * dx + dy * dy;
+    if (distance < bestDistance) {
+      best = rect;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
 function measureCorrections(pending) {
   const corrections = [];
   const hidden = [];
+  const invalid = [];
   let range = null;
   for (let i = 0; i < pending.length; i++) {
     const _pending$i = pending[i],
@@ -1058,10 +1167,16 @@ function measureCorrections(pending) {
     const firstEntry = lineElements.find(l => l.length > 0)?.[0];
     if (firstEntry === void 0 || !firstEntry.el.isConnected) continue;
     range ?? (range = doc.createRange());
-    const paragraphRect = paragraph.getBoundingClientRect();
     const paragraphStyle = doc.defaultView?.getComputedStyle(paragraph);
     const rtl = paragraphStyle?.direction === "rtl";
-    const contentEnd = rtl ? paragraphRect.left + (parseFloat(paragraphStyle?.borderLeftWidth ?? "") || 0) + (parseFloat(paragraphStyle?.paddingLeft ?? "") || 0) : paragraphRect.right - (parseFloat(paragraphStyle?.borderRightWidth ?? "") || 0) - (parseFloat(paragraphStyle?.paddingRight ?? "") || 0);
+    const fragments = fragmentBoxesOf(paragraph, paragraphStyle);
+    if (!fragments.ok) {
+      if (fragments.reason === "zero content width") hidden.push(i);else invalid.push({
+        index: i,
+        reason: fragments.reason
+      });
+      continue;
+    }
     let sawInk = false;
     const paraCorrections = [];
     for (let li = 0; li < lineElements.length; li++) {
@@ -1071,12 +1186,18 @@ function measureCorrections(pending) {
       let rectPx = 0;
       let modelPx = 0;
       let ownMargins = 0;
+      let lineRect = null;
       for (const _ref6 of entries) {
         const el = _ref6.el;
         const seg = _ref6.seg;
         const marginEndEl = _ref6.marginEndEl;
+        let elRect;
+        if (lineRect === null) {
+          elRect = el.getBoundingClientRect();
+          lineRect = elRect;
+        }
         if (seg === null || seg.edgeTrim.lead === 0 && seg.edgeTrim.trail === 0) {
-          rectPx += el.getBoundingClientRect().width;
+          rectPx += (elRect ?? el.getBoundingClientRect()).width;
         } else {
           const node = el.firstChild;
           range.setStart(node, seg.edgeTrim.lead);
@@ -1105,6 +1226,8 @@ function measureCorrections(pending) {
         if (besideFloat) {
           adjustmentPx = physicalLayout - (availableWidth - FLOAT_WRAP_SPARE_PX + rightHang - physicalEndHang + deliberateOverflow);
         } else {
+          const fragment = fragmentForLine(fragments.rects, lineRect, rtl === true);
+          const contentEnd = rtl ? fragment.left + (parseFloat(paragraphStyle?.borderLeftWidth ?? "") || 0) + (parseFloat(paragraphStyle?.paddingLeft ?? "") || 0) : fragment.right - (parseFloat(paragraphStyle?.borderRightWidth ?? "") || 0) - (parseFloat(paragraphStyle?.paddingRight ?? "") || 0);
           const paintEndEntry = entries[entries.length - 1];
           let paintRect;
           if (paintEndEntry.paintEndEl !== void 0) {
@@ -1115,7 +1238,7 @@ function measureCorrections(pending) {
             paintRect = paintEndEntry.el.getBoundingClientRect();
           } else {
             const node = endText?.el.firstChild;
-            const end = endText?.seg.text.trimEnd().length ?? 0;
+            const end = endText === void 0 ? 0 : endWithoutCollapsibleSpaces(endText.seg.text);
             if (node?.nodeType === 3 && end > 0) {
               range.setStart(node, 0);
               range.setEnd(node, end);
@@ -1130,7 +1253,7 @@ function measureCorrections(pending) {
           adjustmentPx = paintedEnd - desiredEnd;
         }
         const correctionTexts = textEntries.map((entry, entryIndex) => entry.seg.text.slice(entryIndex === 0 ? entry.seg.edgeTrim.lead : 0));
-        const spaceCounts = correctionTexts.map(text => text.match(/[ \u00A0]/g)?.length ?? 0);
+        const spaceCounts = textEntries.map((entry, entryIndex) => Math.max(0, entry.seg.adjustableSpaceCount - (entryIndex === 0 ? entry.seg.edgeTrim.lead : 0)));
         const spaces = spaceCounts.reduce((sum, count) => sum + count, 0);
         const spacing = [];
         if (Math.abs(adjustmentPx) > 1e-3 && spaces > 0) {
@@ -1145,7 +1268,7 @@ function measureCorrections(pending) {
             });
           }
         } else if (Math.abs(adjustmentPx) > 1e-3) {
-          const charCounts = correctionTexts.map(text => Array.from(text).length);
+          const charCounts = correctionTexts.map((text, entryIndex) => textEntries[entryIndex].seg.allowLetterCorrection ? Array.from(text).length : 0);
           const chars = charCounts.reduce((sum, count) => sum + count, 0);
           if (chars > 0) {
             const delta = adjustmentPx / chars;
@@ -1161,6 +1284,7 @@ function measureCorrections(pending) {
             }
           }
         }
+        if (Math.abs(adjustmentPx) > 1e-3 && spacing.length === 0) continue;
         const lineEndEntry = entries[entries.length - 1];
         paraCorrections.push({
           el: lineEndEntry.el,
@@ -1179,7 +1303,8 @@ function measureCorrections(pending) {
   }
   return {
     corrections,
-    hidden
+    hidden,
+    invalid
   };
 }
 function applyCorrections(corrections) {
@@ -1197,6 +1322,8 @@ function applyCorrections(corrections) {
 }
 
 // src/dom/segments.ts
+var AUTHOR_NO_BREAK_SPACE = /[\u00A0\u202F]/;
+var DASH_JUNCTION = /[\u002D\u2010-\u2015]/;
 function trackingFeatureSettings(spec, active) {
   if (!active || spec.letterSpacingPx !== 0) return void 0;
   if (spec.ligatures === "none" || /\bno-common-ligatures\b/.test(spec.ligatures)) {
@@ -1309,7 +1436,10 @@ function buildRunMetrics(scan, expansion, spacing, protrusion) {
     };
   });
 }
-function buildRenderSegments(scan, runsMetrics, para, lines) {
+function buildRenderSegments(scan, runsMetrics, para, lines, lineOffset) {
+  if (lineOffset === void 0) {
+    lineOffset = 0;
+  }
   const segments = [];
   let pendingJoint = "none";
   const decorStartSeen = /* @__PURE__ */new Set();
@@ -1335,6 +1465,9 @@ function buildRenderSegments(scan, runsMetrics, para, lines) {
     let cjkZ = 0;
     let hasCJK = false;
     let boxChars = 0;
+    let adjustableSpaceCount = 0;
+    let fixedNoBreakBox = false;
+    let fixedBoundary;
     let flowExclusion;
     let rigidFlex = null;
     const flush = () => {
@@ -1345,13 +1478,13 @@ function buildRenderSegments(scan, runsMetrics, para, lines) {
       const cjkFlex = line.glueRatio >= 0 ? cjkY : cjkZ;
       const extraPx = (trackFlex > 0 ? line.trackRatio * trackFlex : 0) + (cjkFlex > 0 ? line.glueRatio * cjkFlex : 0);
       const ls = boxChars > 0 && extraPx !== 0 ? extraPx / boxChars : 0;
-      const lead = flowText.length - flowText.trimStart().length;
-      const trail = lead < flowText.length ? flowText.length - flowText.trimEnd().length : 0;
+      const lead = leadingCollapsibleSpaces(flowText);
+      const trail = lead < flowText.length ? trailingCollapsibleSpaces(flowText) : 0;
       const spec = scan.specs[scan.runs[run].spec];
       const table = runsMetrics[run].expansionRatios;
       const key = Math.round(line.fontStretch * 1e3) / 1e3;
       const ratio = table?.get(key) ?? 1;
-      const wordSpacing = desired(run, rigidFlex ?? void 0);
+      const wordSpacing = fixedNoBreakBox ? spec.wordSpacingPx : desired(run, rigidFlex ?? void 0);
       const spacePx = spaceWidthIn(spec, scan.runs[run].text) * ratio + wordSpacing;
       const srcRun = scan.runs[run];
       let decorPx;
@@ -1365,7 +1498,9 @@ function buildRenderSegments(scan, runsMetrics, para, lines) {
         floatedStyle: floatedPrefix !== void 0 && !floatStyleEmitted ? scan.floatIntrusion?.style : void 0,
         floatedInnerStyle: floatedPrefix !== void 0 ? srcRun.floatInnerStyle : void 0,
         ancestors: srcRun.ancestors,
-        wordSpacingPx: wordSpacing - ls,
+        wordSpacingPx: fixedNoBreakBox ? wordSpacing : wordSpacing - ls,
+        adjustableSpaceCount,
+        allowLetterCorrection: !fixedNoBreakBox,
         letterSpacingPx: ls !== 0 ? spec.letterSpacingPx + ls : null,
         resolvedLetterSpacingPx: spec.letterSpacingPx + ls,
         fontFeatureSettings: trackingFeatureSettings(spec, ls !== 0),
@@ -1402,14 +1537,31 @@ function buildRenderSegments(scan, runsMetrics, para, lines) {
       cjkZ = 0;
       hasCJK = false;
       boxChars = 0;
+      adjustableSpaceCount = 0;
+      fixedNoBreakBox = false;
       flowExclusion = void 0;
     };
     for (let i = line.start; i < line.end; i++) {
       const it = para.items[i];
       if (it.type === ItemType.Box) {
+        const ownFixedSegment = AUTHOR_NO_BREAK_SPACE.test(it.text);
+        const firstChar = it.text[0] ?? "";
+        if (fixedBoundary !== void 0) {
+          const junction = fixedBoundary.lastChar + firstChar;
+          if (fixedBoundary.run !== it.run && DASH_JUNCTION.test(junction)) {
+            text = "\u2060";
+          }
+          fixedBoundary = void 0;
+        }
+        if (ownFixedSegment && run !== -1) {
+          const junction = text.slice(-1) + firstChar;
+          const protect = run !== it.run && DASH_JUNCTION.test(junction);
+          flush();
+          if (protect) text = "\u2060";
+        }
         if (run !== -1 && run !== it.run) {
-          const junction = text.slice(-1) + (it.text[0] ?? "");
-          const risky = /[\u002D\u2010-\u2015]/.test(junction);
+          const junction = text.slice(-1) + firstChar;
+          const risky = DASH_JUNCTION.test(junction);
           flush();
           text = risky ? "\u2060" : "";
         }
@@ -1427,7 +1579,17 @@ function buildRenderSegments(scan, runsMetrics, para, lines) {
         trackZ += it.trackShrink;
         boxChars += it.flowChars ?? Array.from(it.text).length;
         if (!hasCJK && CJK_CHAR.test(it.text)) hasCJK = true;
+        if (ownFixedSegment) {
+          const boundary = {
+            lastChar: it.text.slice(-1),
+            run: it.run
+          };
+          fixedNoBreakBox = true;
+          flush();
+          fixedBoundary = boundary;
+        }
       } else if (it.type === ItemType.Glue) {
+        fixedBoundary = void 0;
         if (it.cjk === true) {
           cjkY += it.stretch;
           cjkZ += it.shrink;
@@ -1438,6 +1600,7 @@ function buildRenderSegments(scan, runsMetrics, para, lines) {
           flush();
           run = it.run;
           text = " ";
+          adjustableSpaceCount = 1;
           flush();
           continue;
         }
@@ -1445,6 +1608,7 @@ function buildRenderSegments(scan, runsMetrics, para, lines) {
           flush();
           run = it.run;
           text = "\xA0";
+          adjustableSpaceCount = 1;
           rigidFlex = {
             stretch: it.stretch,
             shrink: it.shrink
@@ -1456,10 +1620,12 @@ function buildRenderSegments(scan, runsMetrics, para, lines) {
         if (run === -1 || run === it.run) {
           run = it.run;
           text += " ";
+          adjustableSpaceCount++;
         } else {
           flush();
           run = it.run;
           text = "\xA0";
+          adjustableSpaceCount = 1;
         }
       }
     }
@@ -1474,8 +1640,8 @@ function buildRenderSegments(scan, runsMetrics, para, lines) {
           break;
         }
       }
-      const besideFloat = lineIndex < (scan.floatIntrusion?.lines ?? 0);
-      const physicalEndHang = besideFloat && !line.hyphenated && endBox?.paintedEnd !== true && line.rightHang > 0 && last.text.trimEnd().length > 0 ? line.rightHang : 0;
+      const besideFloat = lineOffset + lineIndex < (scan.floatIntrusion?.lines ?? 0);
+      const physicalEndHang = besideFloat && !line.hyphenated && endBox?.paintedEnd !== true && line.rightHang > 0 && endWithoutCollapsibleSpaces(last.text) > 0 ? line.rightHang : 0;
       if (physicalEndHang > 0) last.physicalEndHangPx = physicalEndHang;
       const hyphenEndHang = besideFloat && line.hyphenated && line.rightHang > 0 && endBox !== void 0 ? line.rightHang : 0;
       if (hyphenEndHang > 0) {
@@ -1674,12 +1840,33 @@ function justify(targets, options) {
     scanned.set(p, scan);
     return true;
   };
-  const buildPara = (scan, runsMetrics, specByKey) => {
+  const buildParts = (scan, runsMetrics, specByKey) => {
     const opts = scan.direction === "rtl" ? {
       ...buildOpts,
       tracking: false
     } : buildOpts;
-    return buildItems(runTexts(scan), runsMetrics, opts, measureFor(specByKey));
+    const texts = runTexts(scan);
+    const measure = measureFor(specByKey);
+    const parts = [];
+    let startRun = 0;
+    const append = (endRun, breakAfter) => {
+      const para = buildItems(texts.slice(startRun, endRun), runsMetrics, opts, measure);
+      if (parts.length > 0) {
+        for (const item of para.items) {
+          if (item.type === ItemType.Box) item.lpFirst = item.lp;
+        }
+      }
+      parts.push({
+        para,
+        breakAfter
+      });
+      startRun = endRun;
+    };
+    for (const hardBreak of scan.hardBreaks) {
+      append(hardBreak.afterRun, hardBreak);
+    }
+    append(texts.length, null);
+    return parts;
   };
   const prepare = p => {
     if (states.get(p)?.enhanced) {
@@ -1700,7 +1887,7 @@ function justify(targets, options) {
         scan,
         runsMetrics,
         specByKey,
-        para: buildPara(scan, runsMetrics, specByKey),
+        parts: buildParts(scan, runsMetrics, specByKey),
         width: scan.contentWidth,
         lastPatch: "",
         enhanced: false
@@ -1771,12 +1958,67 @@ function justify(targets, options) {
       ...buildOpts,
       lastLineMinWidth: paragraphMinWidth
     };
-    const result = breakParagraph(state.para, widths, paragraphBreakOpts);
-    const lines = layoutLines(state.para, result, widths, paragraphBuildOpts);
-    if (lines.length === 1) {
-      const line = lines[0];
-      const adjusted = Math.abs(line.glueRatio) > 1e-9 || Math.abs(line.trackRatio) > 1e-9 || Math.abs(line.fontStretch - 100) > 1e-9;
-      const reachedFullWidth = paragraphMinWidth === 1 && (result.endingMinWidth ?? paragraphMinWidth) >= 1 - 1e-9 && line.overfull !== true && adjusted;
+    const widthAt = line => typeof widths === "number" ? widths : widths[Math.min(line, widths.length - 1)] ?? 0;
+    const widthsFrom = line => typeof widths === "number" ? widths : widths.slice(Math.min(line, widths.length - 1));
+    const rendered = [];
+    const lineWidths = [];
+    const fingerprintParts = [];
+    const priorLastLineFit = {
+      sum: 0,
+      count: 0
+    };
+    let visualLineCount = 0;
+    let modeledLineCount = 0;
+    let onlyLine = null;
+    let onlyResult = null;
+    for (let partIndex = 0; partIndex < state.parts.length; partIndex++) {
+      const part = state.parts[partIndex];
+      const partLineOffset = visualLineCount;
+      const partWidths = widthsFrom(partLineOffset);
+      const isFinal = part.breakAfter === null;
+      let result = null;
+      let lines = [];
+      if (part.para.firstBoxAfter[0] !== part.para.items.length) {
+        const partBuildOpts = !isFinal && paragraphBuildOpts.lastLineFit !== 0 ? {
+          ...paragraphBuildOpts,
+          lastLineFit: 0
+        } : paragraphBuildOpts;
+        result = breakParagraph(part.para, partWidths, paragraphBreakOpts);
+        lines = layoutLines(part.para, result, partWidths, partBuildOpts, isFinal ? priorLastLineFit : void 0);
+        rendered.push(...buildRenderSegments(state.scan, state.runsMetrics, part.para, lines, partLineOffset));
+        for (const line of lines) lineWidths.push(line.width);
+        visualLineCount += lines.length;
+        modeledLineCount += lines.length;
+        if (modeledLineCount === 1) {
+          onlyLine = lines[0] ?? null;
+          onlyResult = result;
+        } else {
+          onlyLine = null;
+          onlyResult = null;
+        }
+        for (let i = 0; i + 1 < lines.length; i++) {
+          priorLastLineFit.sum += lines[i].glueRatio;
+          priorLastLineFit.count++;
+        }
+        fingerprintParts.push(`${partIndex}:${result.breakpoints.join(",")}:${result.endingMinWidth ?? ""}:${lines.map(line => `${line.glueRatio.toFixed(4)}:${line.trackRatio.toFixed(4)}:${line.fontStretch}`).join(",")}`);
+      } else {
+        fingerprintParts.push(`${partIndex}:empty`);
+      }
+      if (part.breakAfter !== null) {
+        if (lines.length === 0) {
+          lineWidths.push(widthAt(visualLineCount));
+          visualLineCount++;
+        }
+        rendered.push({
+          kind: "hard-break",
+          source: part.breakAfter.source,
+          ancestors: part.breakAfter.ancestors
+        });
+      }
+    }
+    if (visualLineCount === 1 && state.scan.hardBreaks.length === 0 && onlyLine !== null && onlyResult !== null) {
+      const adjusted = Math.abs(onlyLine.glueRatio) > 1e-9 || Math.abs(onlyLine.trackRatio) > 1e-9 || Math.abs(onlyLine.fontStretch - 100) > 1e-9;
+      const reachedFullWidth = paragraphMinWidth === 1 && (onlyResult.endingMinWidth ?? paragraphMinWidth) >= 1 - 1e-9 && onlyLine.overfull !== true && adjusted;
       if (!reachedFullWidth) {
         pendingWidths.delete(p);
         pendingCorrections.delete(p);
@@ -1787,8 +2029,7 @@ function justify(targets, options) {
         };
       }
     }
-    const rendered = buildRenderSegments(state.scan, state.runsMetrics, state.para, lines);
-    const fingerprint = result.breakpoints.join(",") + "|" + lines.map(l => `${l.glueRatio.toFixed(4)}:${l.fontStretch}`).join(",");
+    const fingerprint = fingerprintParts.join("|");
     if (fingerprint === state.lastPatch) return {
       changed: false,
       pending: null
@@ -1801,6 +2042,9 @@ function justify(targets, options) {
       if (state.scan.floatIntrusion !== null) p.setAttribute("data-justif-dropcap", "");
       disableTextAutosizing(p);
       p.style.textAlign = state.scan.direction === "rtl" ? "right" : "left";
+      if (state.scan.justifyAll) {
+        p.style.textAlignLast = state.scan.direction === "rtl" ? "right" : "left";
+      }
       p.style.setProperty("hanging-punctuation", "none");
       if (state.scan.specs[state.scan.baseSpec].hyphens === "auto") {
         p.style.setProperty("hyphens", "manual");
@@ -1808,13 +2052,13 @@ function justify(targets, options) {
       }
     }
     if (state.scan.pinIntrinsicSize && state.scan.lineHeightPx !== null) {
-      p.style.containIntrinsicBlockSize = `auto ${Math.round(lines.length * state.scan.lineHeightPx * 1e3) / 1e3}px`;
+      p.style.containIntrinsicBlockSize = `auto ${Math.round(visualLineCount * state.scan.lineHeightPx * 1e3) / 1e3}px`;
     }
     pendingCorrections.delete(p);
     hiddenCorrections.delete(p);
     return {
       changed: true,
-      pending: writeParagraph(p, rendered, lines.map(l => l.width), intrusion?.lines ?? 0)
+      pending: writeParagraph(p, rendered, lineWidths, intrusion?.lines ?? 0)
     };
   };
   const flushPatches = batch => {
@@ -1826,11 +2070,27 @@ function justify(targets, options) {
     if (measure.length > 0) {
       const _measureCorrections = measureCorrections(measure.map(e => e.pending)),
         corrections = _measureCorrections.corrections,
-        hidden = _measureCorrections.hidden;
+        hidden = _measureCorrections.hidden,
+        invalid = _measureCorrections.invalid;
       applyCorrections(corrections);
       for (const i of hidden) {
         const e = measure[i];
         hiddenCorrections.set(e.p, e.pending);
+      }
+      for (const _ref9 of invalid) {
+        const index = _ref9.index;
+        const reason = _ref9.reason;
+        const e = measure[index];
+        const state = states.get(e.p);
+        if (state === void 0 || state.owner !== owner) continue;
+        pendingWidths.delete(e.p);
+        pendingCorrections.delete(e.p);
+        hiddenCorrections.delete(e.p);
+        const changed = state.enhanced;
+        restore(e.p);
+        bailed.add(e.p);
+        emitSkip(e.p, reason);
+        if (changed) emitRelayout(e.p);
       }
     }
   };
@@ -1843,7 +2103,7 @@ function justify(targets, options) {
         try {
           const specByKey = new Map(scan.specs.map(spec => [spec.key, spec]));
           const runsMetrics = buildRunMetrics(scan, expansion, spacing, protrusionCtx);
-          buildPara(scan, runsMetrics, specByKey);
+          buildParts(scan, runsMetrics, specByKey);
         } catch {}
       }
     });
@@ -1900,17 +2160,17 @@ function justify(targets, options) {
       }] : [];
     });
     let changed = false;
-    for (const _ref9 of candidates) {
-      const p = _ref9.p;
-      const state = _ref9.state;
+    for (const _ref0 of candidates) {
+      const p = _ref0.p;
+      const state = _ref0.state;
       pendingWidths.delete(p);
       pendingCorrections.delete(p);
       hiddenCorrections.delete(p);
       if (restoreManagedOutput(p, state)) changed = true;
     }
-    for (const _ref0 of candidates) {
-      const p = _ref0.p;
-      const state = _ref0.state;
+    for (const _ref1 of candidates) {
+      const p = _ref1.p;
+      const state = _ref1.state;
       const next = floatIntrusionOf(p, state.scan.runs.map(run => run.text).join(""));
       if (next === null) {
         states.delete(p);
@@ -1943,7 +2203,7 @@ function justify(targets, options) {
         if (!state.scan.specs.some(requiresDomMeasurement)) continue;
         try {
           const runsMetrics = buildRunMetrics(state.scan, expansion, spacing, protrusionCtx);
-          buildPara(state.scan, runsMetrics, state.specByKey);
+          buildParts(state.scan, runsMetrics, state.specByKey);
         } catch {}
       }
     });
@@ -1951,9 +2211,21 @@ function justify(targets, options) {
     const changed = [];
     for (const p of mine) {
       const state = states.get(p);
+      const width = widths.get(p);
+      if (typeof width === "string") {
+        pendingWidths.delete(p);
+        pendingCorrections.delete(p);
+        hiddenCorrections.delete(p);
+        const wasEnhanced = state.enhanced;
+        restore(p);
+        bailed.add(p);
+        emitSkip(p, width);
+        if (wasEnhanced) changed.push(p);
+        continue;
+      }
       state.runsMetrics = buildRunMetrics(state.scan, expansion, spacing, protrusionCtx);
-      state.para = buildPara(state.scan, state.runsMetrics, state.specByKey);
-      state.width = widths.get(p);
+      state.parts = buildParts(state.scan, state.runsMetrics, state.specByKey);
+      state.width = width;
       state.lastPatch = "";
       const outcome = safePatch(p);
       if (outcome.pending !== null) batch.push({
@@ -2153,9 +2425,9 @@ function justify(targets, options) {
     }
     if (options.observeResize !== false) {
       observer = createWidthObserver(widths => {
-        for (const _ref1 of widths) {
-          const el = _ref1[0];
-          const width = _ref1[1];
+        for (const _ref10 of widths) {
+          const el = _ref10[0];
+          const width = _ref10[1];
           const state = states.get(el);
           if (state === void 0 || state.owner !== owner) continue;
           if (Math.abs(width - state.width) < 0.05) {
@@ -2184,9 +2456,9 @@ function justify(targets, options) {
   } finally {
     restoreScanStyles();
   }
-  for (const _ref10 of pendingSkips) {
-    const p = _ref10.p;
-    const reason = _ref10.reason;
+  for (const _ref11 of pendingSkips) {
+    const p = _ref11.p;
+    const reason = _ref11.reason;
     emitSkip(p, reason);
   }
   const KERN_SAMPLE_MAX = 256;
@@ -2210,9 +2482,9 @@ function justify(targets, options) {
       if (hyphenate !== void 0 || run.text.includes("\xAD")) s.chars.add("-");
     }
   }
-  fontProbes = [...fontSample].map(_ref11 => {
-    let font = _ref11[0],
-      s = _ref11[1];
+  fontProbes = [...fontSample].map(_ref12 => {
+    let font = _ref12[0],
+      s = _ref12[1];
     return {
       font,
       sample: s.chars.size === 0 ? " " : [...s.chars].join(""),

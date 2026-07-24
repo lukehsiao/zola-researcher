@@ -111,7 +111,10 @@ declare function breakParagraph(para: ParagraphItems, widths: LineWidths, opts: 
  * inter-word glue. The same ratio drives both because expansion participated
  * in the breaker's stretch/shrink totals.
  */
-declare function layoutLines(para: ParagraphItems, breaks: BreakResult, widths: LineWidths, opts: BuildOptions): Line[];
+declare function layoutLines(para: ParagraphItems, breaks: BreakResult, widths: LineWidths, opts: BuildOptions, priorLastLineFit?: Readonly<{
+    sum: number;
+    count: number;
+}>): Line[];
 /**
  * Plain-text content of a line (CLI demos, tests, clipboard fixups). Breaks
  * taken at hyphenation points append U+2010 (not ASCII "-") so consumers can

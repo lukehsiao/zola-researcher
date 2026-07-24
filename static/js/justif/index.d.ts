@@ -16,8 +16,9 @@ interface JustifyOptions {
     finalHyphenDemerits?: number;
     emergencyStretch?: number | "auto";
     /**
-     * Keep paragraph endings at least this fraction of the measure wide
-     * (0.33 ≈ Bringhurst's "at least a third"). Two mechanisms compose.
+     * Keep paragraph endings and lines terminated by `<br>` at least this
+     * fraction of the measure wide (0.33 ≈ Bringhurst's "at least a third").
+     * Two mechanisms compose.
      * The breaker prefers arrangements whose endings reach the threshold
      * naturally — cost pressure that escalates into hyphenation when
      * needed, and prices endings by exactly what will render, so it steers
@@ -92,7 +93,9 @@ interface JustifyOptions {
      * spaces are set at this fraction (0–1) of the paragraph's average
      * looseness, instead of always natural width — a connoisseur's
      * refinement mainstream DTP tools only approximate with a static
-     * "desired spacing" value. 0 (default) = off.
+     * "desired spacing" value. Lines terminated by `<br>` contribute their
+     * justified body lines to the average but do not receive last-line fitting
+     * themselves. 0 (default) = off.
      */
     lastLineFit?: number;
     /**
