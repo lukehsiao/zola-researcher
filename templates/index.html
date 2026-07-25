@@ -35,6 +35,13 @@
     <script src="{{ get_url(path="/js/instantpage.min.js") }}" defer></script>
     {%- endif %}
     {% if config.extra.justif_enable -%}
+    {#- justif is a three-level module waterfall: init imports index.js and
+        en-us.js, which import hashed chunks. Preloading the stable middle
+        level cuts a serialized network round trip on cold loads. The hashed
+        chunk names are not preloaded here because they change with every
+        vendored justif update. -#}
+    <link rel="modulepreload" href="{{ get_url(path="/js/justif/index.js") }}">
+    <link rel="modulepreload" href="{{ get_url(path="/js/justif/hyphenate/en-us.js") }}">
     <script type="module" src="{{ get_url(path="/js/justif-init.js") }}"></script>
     {%- endif %}
     {% if config.extra.katex_enable %}
