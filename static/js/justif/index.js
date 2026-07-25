@@ -1,5 +1,5 @@
-import { composeProtrusion, latinProtrusion, defaultBuildOptions, breakParagraph, layoutLines, defaultBreakOptions, ItemType, CJK_CHAR, graphemes, fontProtrusion, textMakesBox, buildItems } from './chunk-GKFOJ2MH.js';
-export { composeProtrusion, fontProtrusion, hangingPunctuation, kinsokuNotAtLineEnd, kinsokuNotAtLineStart, latinProtrusion } from './chunk-GKFOJ2MH.js';
+import { composeProtrusion, latinProtrusion, defaultBuildOptions, breakParagraph, layoutLines, defaultBreakOptions, ItemType, CJK_CHAR, graphemes, fontProtrusion, textMakesBox, buildItems } from './chunk-SNOJHREQ.js';
+export { composeProtrusion, fontProtrusion, hangingPunctuation, kinsokuNotAtLineEnd, kinsokuNotAtLineStart, latinProtrusion } from './chunk-SNOJHREQ.js';
 
 // src/dom/measure.ts
 function fontSpecOf(style) {
@@ -933,7 +933,7 @@ var CORRECTION_WINDOW_PX = -3;
 var FLOAT_WRAP_SPARE_PX = 0.25;
 var STYLE_ID = "justif-style";
 var px = v => `${Math.round(v * 1e3) / 1e3}px`;
-var SHEET_TEXT = '.justif-seg{white-space:nowrap}[data-justif-dropcap]::first-letter{all:unset!important}.justif-hyphen::after{content:"-"}@supports (content:"-" / ""){.justif-hyphen::after{content:"-" / ""}}';
+var SHEET_TEXT = '.justif-seg{white-space:nowrap}[data-justif-dropcap]::first-letter{all:unset!important}.justif-hyphen::after{content:"-"}.justif-break::after{content:"\u200B"}@supports (content:"-" / ""){.justif-hyphen::after{content:"-" / ""}.justif-break::after{content:"\u200B" / ""}}';
 function disableTextAutosizing(el) {
   el.style.setProperty("-webkit-text-size-adjust", "100%", "important");
   el.style.setProperty("text-size-adjust", "100%", "important");
@@ -1043,7 +1043,11 @@ function writeParagraph(p, contents, lineWidths, physicalFitLines) {
       const depth = Math.min(commonDepth(segment.ancestors), stack.length);
       stack.length = depth;
       const container2 = containerAt(depth);
-      if (segment.joint === "space") container2.append(doc.createTextNode(" "));else container2.append(doc.createElement("wbr"));
+      if (segment.joint === "space") container2.append(doc.createTextNode(" "));else {
+        const brk = doc.createElement("span");
+        brk.className = "justif-break";
+        container2.append(brk);
+      }
     }
     const container = containerFor(segment.ancestors);
     if (segment.floatedPrefix !== void 0) {
@@ -1182,15 +1186,36 @@ function measureCorrections(pending) {
     for (let li = 0; li < lineElements.length; li++) {
       const entries = lineElements[li];
       if (entries.length === 0) continue;
+      const mutated = entries.some(_ref6 => {
+        let el = _ref6.el,
+          seg = _ref6.seg;
+        if (seg === null) return false;
+        const singleText = el.childNodes.length === 1 && el.firstChild?.nodeType === 3 && el.firstChild.data === seg.text;
+        if (!(seg.physicalEndHangPx !== void 0 && seg.physicalEndHangPx > 0)) {
+          return !singleText;
+        }
+        const mid = el.childNodes[1];
+        const hangShape = el.childNodes.length === 3 && el.firstChild?.nodeType === 3 && mid?.nodeType === 1 && mid.className === "justif-hanging-end" && el.lastChild?.nodeType === 3 && el.textContent === seg.text;
+        return !(singleText || hangShape);
+      });
+      if (mutated) {
+        if (!sawInk) {
+          sawInk = entries.some(_ref7 => {
+            let el = _ref7.el;
+            return el.getBoundingClientRect().width > 0;
+          });
+        }
+        continue;
+      }
       const availableWidth = lineWidths[li] ?? lineWidths[lineWidths.length - 1] ?? 0;
       let rectPx = 0;
       let modelPx = 0;
       let ownMargins = 0;
       let lineRect = null;
-      for (const _ref6 of entries) {
-        const el = _ref6.el;
-        const seg = _ref6.seg;
-        const marginEndEl = _ref6.marginEndEl;
+      for (const _ref8 of entries) {
+        const el = _ref8.el;
+        const seg = _ref8.seg;
+        const marginEndEl = _ref8.marginEndEl;
         let elRect;
         if (lineRect === null) {
           elRect = el.getBoundingClientRect();
@@ -1661,9 +1686,9 @@ function buildRenderSegments(scan, runsMetrics, para, lines, lineOffset) {
       pendingJoint = brk.cjk === true ? "wbr" : "space";
     } else pendingJoint = "wbr";
   }
-  for (const _ref7 of lastSegForRun) {
-    const runIndex = _ref7[0];
-    const segIndex = _ref7[1];
+  for (const _ref9 of lastSegForRun) {
+    const runIndex = _ref9[0];
+    const segIndex = _ref9[1];
     const seg = segments[segIndex];
     seg.decorPx = (seg.decorPx ?? 0) + scan.runs[runIndex].padEndPx;
     seg.decorEndOwner = scan.runs[runIndex].padEndOwner;
@@ -1804,9 +1829,9 @@ function justify(targets, options) {
       }
     }
     return () => {
-      for (const _ref8 of saved) {
-        const el = _ref8.el;
-        const style = _ref8.style;
+      for (const _ref0 of saved) {
+        const el = _ref0.el;
+        const style = _ref0.style;
         restoreStyleAttribute(el, style);
       }
     };
@@ -2077,9 +2102,9 @@ function justify(targets, options) {
         const e = measure[i];
         hiddenCorrections.set(e.p, e.pending);
       }
-      for (const _ref9 of invalid) {
-        const index = _ref9.index;
-        const reason = _ref9.reason;
+      for (const _ref1 of invalid) {
+        const index = _ref1.index;
+        const reason = _ref1.reason;
         const e = measure[index];
         const state = states.get(e.p);
         if (state === void 0 || state.owner !== owner) continue;
@@ -2160,17 +2185,17 @@ function justify(targets, options) {
       }] : [];
     });
     let changed = false;
-    for (const _ref0 of candidates) {
-      const p = _ref0.p;
-      const state = _ref0.state;
+    for (const _ref10 of candidates) {
+      const p = _ref10.p;
+      const state = _ref10.state;
       pendingWidths.delete(p);
       pendingCorrections.delete(p);
       hiddenCorrections.delete(p);
       if (restoreManagedOutput(p, state)) changed = true;
     }
-    for (const _ref1 of candidates) {
-      const p = _ref1.p;
-      const state = _ref1.state;
+    for (const _ref11 of candidates) {
+      const p = _ref11.p;
+      const state = _ref11.state;
       const next = floatIntrusionOf(p, state.scan.runs.map(run => run.text).join(""));
       if (next === null) {
         states.delete(p);
@@ -2425,9 +2450,9 @@ function justify(targets, options) {
     }
     if (options.observeResize !== false) {
       observer = createWidthObserver(widths => {
-        for (const _ref10 of widths) {
-          const el = _ref10[0];
-          const width = _ref10[1];
+        for (const _ref12 of widths) {
+          const el = _ref12[0];
+          const width = _ref12[1];
           const state = states.get(el);
           if (state === void 0 || state.owner !== owner) continue;
           if (Math.abs(width - state.width) < 0.05) {
@@ -2456,9 +2481,9 @@ function justify(targets, options) {
   } finally {
     restoreScanStyles();
   }
-  for (const _ref11 of pendingSkips) {
-    const p = _ref11.p;
-    const reason = _ref11.reason;
+  for (const _ref13 of pendingSkips) {
+    const p = _ref13.p;
+    const reason = _ref13.reason;
     emitSkip(p, reason);
   }
   const KERN_SAMPLE_MAX = 256;
@@ -2482,9 +2507,9 @@ function justify(targets, options) {
       if (hyphenate !== void 0 || run.text.includes("\xAD")) s.chars.add("-");
     }
   }
-  fontProbes = [...fontSample].map(_ref12 => {
-    let font = _ref12[0],
-      s = _ref12[1];
+  fontProbes = [...fontSample].map(_ref14 => {
+    let font = _ref14[0],
+      s = _ref14[1];
     return {
       font,
       sample: s.chars.size === 0 ? " " : [...s.chars].join(""),

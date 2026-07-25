@@ -1,5 +1,5 @@
-import { j as ProtrusionTable, E as ExpansionOptions, T as TrackingOptions } from './protrusion-fonts-DXWy6i9x.js';
-export { H as HangingPunctuationMode, d as Line, l as composeProtrusion, o as fontProtrusion, q as hangingPunctuation, r as kinsokuNotAtLineEnd, s as kinsokuNotAtLineStart, t as latinProtrusion } from './protrusion-fonts-DXWy6i9x.js';
+import { j as ProtrusionTable, E as ExpansionOptions, T as TrackingOptions } from './protrusion-fonts-lK8re2yo.js';
+export { H as HangingPunctuationMode, d as Line, l as composeProtrusion, o as fontProtrusion, q as hangingPunctuation, r as kinsokuNotAtLineEnd, s as kinsokuNotAtLineStart, t as latinProtrusion } from './protrusion-fonts-lK8re2yo.js';
 
 interface JustifyOptions {
     /** Word splitter, e.g. `hyphenateEnUS` from "justif/hyphenate/en-us".

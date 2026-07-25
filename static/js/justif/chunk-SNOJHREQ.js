@@ -3034,5 +3034,5 @@ function fontProtrusion(familyList) {
   return id === void 0 ? void 0 : TABLES[id];
 }
 export { CJK_CHAR, Fitness, INF_BAD, INF_PENALTY, ItemType, UNDERFULL_RATIO, badness, breakParagraph, breakRp, buildItems, cjkBreakAllowed, composeProtrusion, defaultBreakOptions, defaultBuildOptions, demerits, demeritsUncapped, fitness, fontProtrusion, graphemes, hangingPunctuation, kinsokuNotAtLineEnd, kinsokuNotAtLineStart, latinProtrusion, layoutLines, lineText, lineWidthAt, maxEndingStretch, protrusionCodes, textMakesBox, withSums };
-//# sourceMappingURL=chunk-GKFOJ2MH.js.map
-//# sourceMappingURL=chunk-GKFOJ2MH.js.map
+//# sourceMappingURL=chunk-SNOJHREQ.js.map
+//# sourceMappingURL=chunk-SNOJHREQ.js.map
