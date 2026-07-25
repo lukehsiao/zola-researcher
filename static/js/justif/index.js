@@ -933,7 +933,14 @@ var CORRECTION_WINDOW_PX = -3;
 var FLOAT_WRAP_SPARE_PX = 0.25;
 var STYLE_ID = "justif-style";
 var px = v => `${Math.round(v * 1e3) / 1e3}px`;
-var SHEET_TEXT = '.justif-seg{white-space:nowrap}[data-justif-dropcap]::first-letter{all:unset!important}.justif-hyphen::after{content:"-"}.justif-break::after{content:"\u200B"}@supports (content:"-" / ""){.justif-hyphen::after{content:"-" / ""}.justif-break::after{content:"\u200B" / ""}}';
+var SHEET_TEXT =
+// Emergency-break licences are neutralized on the paragraph too, but
+// Firefox resolves them from the element AT the break point, so the
+// paragraph reset alone leaves it breaking whenever an author rule grants
+// one closer in — `!important`, or a nested inline the segments are cloned
+// into (`a{overflow-wrap:break-word}`). This rule is what covers Firefox
+// in those cases; Chromium consults the block container and ignores it.
+'.justif-seg,.justif-hyphen,.justif-break{overflow-wrap:normal;word-break:normal;line-break:auto}.justif-seg{white-space:nowrap}[data-justif-dropcap]::first-letter{all:unset!important}.justif-hyphen{white-space:nowrap}.justif-hyphen::after{content:"-"}.justif-break::after{content:"\u200B"}@supports (content:"-" / ""){.justif-hyphen::after{content:"-" / ""}.justif-break::after{content:"\u200B" / ""}}';
 function disableTextAutosizing(el) {
   el.style.setProperty("-webkit-text-size-adjust", "100%", "important");
   el.style.setProperty("text-size-adjust", "100%", "important");
@@ -1273,6 +1280,12 @@ function measureCorrections(pending) {
           let paintedEnd = rtl ? -paintRect.left : paintRect.right;
           if (paintEndEntry.paintEndEl !== void 0 && paintEndEntry.marginEndEl !== paintEndEntry.paintEndEl && paintEndEntry.paintEndEl.contains(paintEndEntry.marginEndEl)) {
             paintedEnd -= parseFloat(paintEndEntry.marginEndEl.style.marginInlineEnd) || 0;
+          }
+          if (paintEndEntry.seg === null && endText !== void 0) {
+            const textRect = endText.el.getBoundingClientRect();
+            if (Math.abs(paintRect.top - textRect.top) > 0.5 || fragmentForLine(fragments.rects, paintRect, rtl === true) !== fragment) {
+              continue;
+            }
           }
           const desiredEnd = (rtl ? -contentEnd : contentEnd) + rightHang + deliberateOverflow;
           adjustmentPx = paintedEnd - desiredEnd;
@@ -2071,6 +2084,9 @@ function justify(targets, options) {
         p.style.textAlignLast = state.scan.direction === "rtl" ? "right" : "left";
       }
       p.style.setProperty("hanging-punctuation", "none");
+      p.style.setProperty("overflow-wrap", "normal");
+      p.style.setProperty("word-break", "normal");
+      p.style.setProperty("line-break", "auto");
       if (state.scan.specs[state.scan.baseSpec].hyphens === "auto") {
         p.style.setProperty("hyphens", "manual");
         p.style.setProperty("-webkit-hyphens", "manual");
