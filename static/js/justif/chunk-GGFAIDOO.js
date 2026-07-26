@@ -558,8 +558,13 @@ function lineWidthAt(widths, line) {
 var SOFT_HYPHEN = "\xAD";
 var WORD_CORE = /^(\P{L}*)(\p{L}+)(\P{L}*)$/u;
 var MIN_HYPHENATION_LENGTH = 5;
-var BREAKABLE_SPACE = /[^\S\u00A0\u202F]/;
 var BREAKABLE_SPLIT = /([^\S\u00A0\u202F]+)/;
+function mayBeCJK(text) {
+  for (let i = 0; i < text.length; i++) {
+    if (text.charCodeAt(i) >= 4352) return true;
+  }
+  return false;
+}
 function textMakesBox(text) {
   return /[^\s\u00AD]|[\u00A0\u202F]/u.test(text);
 }
@@ -580,7 +585,70 @@ function endingFloorRatio(need, glueY, flexY, maxRatio) {
   if (pooled <= flexCap) return pooled;
   return glueY > 0 ? (need - flexY * flexCap) / glueY : flexCap;
 }
-function protrusionHang(opts, measure, ch, run, advance, side, firstLine) {
+function firstCodePoint(text) {
+  const code = text.charCodeAt(0);
+  if (code >= 55296 && code <= 56319 && text.length > 1) {
+    const next = text.charCodeAt(1);
+    if (next >= 56320 && next <= 57343) return text.slice(0, 2);
+  }
+  return text[0];
+}
+function lastCodePoint(text) {
+  const n = text.length;
+  const code = text.charCodeAt(n - 1);
+  if (code >= 56320 && code <= 57343 && n > 1) {
+    const prev = text.charCodeAt(n - 2);
+    if (prev >= 55296 && prev <= 56319) return text.slice(n - 2);
+  }
+  return text[n - 1];
+}
+function codePointLength(text) {
+  let count = 0;
+  for (let i = 0; i < text.length; i++) {
+    const code = text.charCodeAt(i);
+    if (code >= 55296 && code <= 56319 && i + 1 < text.length) {
+      const next = text.charCodeAt(i + 1);
+      if (next >= 56320 && next <= 57343) i++;
+    }
+    count++;
+  }
+  return count;
+}
+function splitAfterHyphens(token) {
+  if (token.indexOf("-") < 0) return [token];
+  const chunks = [];
+  let start = 0;
+  for (let i = 0; i < token.length - 1; i++) {
+    if (token[i] === "-" && token[i + 1] !== "-") {
+      chunks.push(token.slice(start, i + 1));
+      start = i + 1;
+    }
+  }
+  chunks.push(token.slice(start));
+  return chunks;
+}
+function clipExclusion(exclusion, start, length) {
+  const end = start + length;
+  if (exclusion === void 0 || exclusion.start >= exclusion.end || exclusion.start >= end || exclusion.end <= start) {
+    return null;
+  }
+  return {
+    start: Math.max(0, exclusion.start - start),
+    end: Math.min(length, exclusion.end - start)
+  };
+}
+function excludeFlow(text, start, exclusion) {
+  const clipped = clipExclusion(exclusion ?? void 0, start, text.length);
+  if (clipped === null) return {
+    flowText: text
+  };
+  return {
+    flowText: text.slice(0, clipped.start) + text.slice(clipped.end),
+    flowExclusion: clipped
+  };
+}
+var LAZY_ADVANCE = -1;
+function protrusionHang(opts, measure, ch, run, advanceOrLazy, side, firstLine) {
   if (firstLine === void 0) {
     firstLine = false;
   }
@@ -588,6 +656,7 @@ function protrusionHang(opts, measure, ch, run, advance, side, firstLine) {
   const table = firstLine ? run.protrusionFirst ?? opts.protrusionFirst ?? run.protrusion ?? opts.protrusion : run.protrusion ?? opts.protrusion;
   const advCode = protrusionCodes(table, ch)?.[side] ?? 0;
   if (advCode === 0) return 0;
+  const advance = advanceOrLazy < 0 ? measure.charAdvance(ch, run) : advanceOrLazy;
   const advHang = advCode / 1e3 * advance;
   if (run.protrudeInkOnly === true && measure.inkBearings !== void 0) {
     return Math.min(advHang, measure.inkBearings(ch, run)[side]);
@@ -627,7 +696,7 @@ function buildItems(texts, runs, opts, measure) {
     }
     items.push(box);
     hasBox = true;
-    if ((box.flowChars ?? Array.from(box.text).length) > 0) hasFlowBox = true;
+    if ((box.flowChars ?? box.text.length) > 0) hasFlowBox = true;
     lastBox = box;
     lastBoxRun = runIndex;
     lastBoxKey = pieceKey;
@@ -642,16 +711,14 @@ function buildItems(texts, runs, opts, measure) {
     let rp = 0;
     let lpFirst = 0;
     if (opts.protrusion !== false && flowText.length > 0) {
-      const chars = Array.from(flowText);
-      const first = chars[0];
-      const last = chars[chars.length - 1];
+      const first = firstCodePoint(flowText);
+      const last = lastCodePoint(flowText);
       if (!piecePaintedStart) {
-        const firstAdv = measure.charAdvance(first, run);
-        lp = protrusionHang(opts, measure, first, run, firstAdv, "l");
-        lpFirst = (run.protrusionFirst ?? opts.protrusionFirst) === void 0 ? lp : protrusionHang(opts, measure, first, run, firstAdv, "l", true);
+        lp = protrusionHang(opts, measure, first, run, LAZY_ADVANCE, "l");
+        lpFirst = (run.protrusionFirst ?? opts.protrusionFirst) === void 0 ? lp : protrusionHang(opts, measure, first, run, LAZY_ADVANCE, "l", true);
       }
       if (!piecePaintedEnd) {
-        rp = protrusionHang(opts, measure, last, run, measure.charAdvance(last, run), "r");
+        rp = protrusionHang(opts, measure, last, run, LAZY_ADVANCE, "r");
       }
     }
     let expStretch = 0;
@@ -666,14 +733,17 @@ function buildItems(texts, runs, opts, measure) {
       trackStretch = width * opts.tracking.max;
       trackShrink = width * opts.tracking.shrink;
     }
-    const textChars = Array.from(text).length;
-    const flowChars = Array.from(flowText).length;
+    let boxFlowChars;
+    if (flowText !== text) {
+      const flowChars = codePointLength(flowText);
+      if (flowChars !== codePointLength(text)) boxFlowChars = flowChars;
+    }
     return {
       type: ItemType.Box,
       width,
       run: runIndex,
       text,
-      flowChars: flowChars === textChars ? void 0 : flowChars,
+      flowChars: boxFlowChars,
       flowExclusion,
       lp,
       lpFirst,
@@ -684,66 +754,71 @@ function buildItems(texts, runs, opts, measure) {
       trackShrink
     };
   };
-  const pushPenalty = p => {
+  const pushPenalty = (penalty, width, flagged, hyphen, rp, runIndex) => {
     items.push({
       type: ItemType.Penalty,
-      ...p
+      penalty,
+      width,
+      flagged,
+      hyphen,
+      rp,
+      run: runIndex
     });
   };
+  const pieceText = [];
+  const pieceAfter = [];
+  const pieceFromHyphenator = [];
+  let pieceCount = 0;
   const chunkPieces = (chunk, noHyphens) => {
     if (noHyphens) {
-      const text = chunk.split(SOFT_HYPHEN).join("");
-      return {
-        pieces: text.length > 0 ? [text] : [],
-        fromHyphenator: false
-      };
+      const text = chunk.includes(SOFT_HYPHEN) ? chunk.split(SOFT_HYPHEN).join("") : chunk;
+      if (text.length > 0) pieceText[pieceCount++] = text;
+      return false;
     }
     if (chunk.includes(SOFT_HYPHEN)) {
-      return {
-        pieces: chunk.split(SOFT_HYPHEN).filter(s => s.length > 0),
-        fromHyphenator: false
-      };
+      for (const part of chunk.split(SOFT_HYPHEN)) {
+        if (part.length > 0) pieceText[pieceCount++] = part;
+      }
+      return false;
     }
-    if (opts.hyphenate) {
+    if (opts.hyphenate && chunk.length >= MIN_HYPHENATION_LENGTH) {
       const m = WORD_CORE.exec(chunk);
       if (m && m[2].length >= MIN_HYPHENATION_LENGTH) {
         const prefix = m[1];
         const core = m[2];
         const suffix = m[3];
-        const parts = opts.hyphenate(core.toLowerCase()).filter(p => p.length > 0);
-        if (parts.length > 1 && parts.join("").length === core.length) {
-          const pieces = [];
+        const parts = opts.hyphenate(core.toLowerCase());
+        let nonEmpty = 0;
+        let joined = 0;
+        for (const part of parts) {
+          if (part.length > 0) nonEmpty++;
+          joined += part.length;
+        }
+        if (nonEmpty > 1 && joined === core.length) {
+          const first = pieceCount;
           let off = 0;
           for (const part of parts) {
-            pieces.push(core.slice(off, off + part.length));
+            if (part.length > 0) {
+              pieceText[pieceCount++] = core.slice(off, off + part.length);
+            }
             off += part.length;
           }
-          pieces[0] = prefix + pieces[0];
-          pieces[pieces.length - 1] = pieces[pieces.length - 1] + suffix;
-          return {
-            pieces,
-            fromHyphenator: true
-          };
+          if (prefix.length > 0) pieceText[first] = prefix + pieceText[first];
+          if (suffix.length > 0) {
+            pieceText[pieceCount - 1] = pieceText[pieceCount - 1] + suffix;
+          }
+          return true;
         }
       }
     }
-    return {
-      pieces: [chunk],
-      fromHyphenator: false
-    };
+    pieceText[pieceCount++] = chunk;
+    return false;
   };
   const flushPendingSpace = nextRun => {
     if (pendingSpaceRun >= 0 && hasBox) {
       const space = runs[pendingSpaceRun].space;
       if (pendingLeadingSpace || pieceKey !== void 0 && pieceKey === lastBoxKey) {
-        pushPenalty({
-          penalty: INF_PENALTY,
-          width: 0,
-          flagged: false,
-          hyphen: false,
-          rp: 0,
-          run: pendingSpaceRun
-        });
+        pushPenalty(INF_PENALTY, 0, false, false, 0, pendingSpaceRun);
       }
       const boundary = lastBoxRun >= 0 && runs[lastBoxRun].familyKey !== runs[nextRun].familyKey;
       items.push({
@@ -761,69 +836,53 @@ function buildItems(texts, runs, opts, measure) {
   };
   const pushWord = (token, runIndex, exclusion) => {
     const run = runs[runIndex];
-    const chunks = pieceKey !== void 0 ? [token] : token.split(/(?<=-)(?=[^-])/);
-    const plans = [];
-    for (let c = 0; c < chunks.length; c++) {
-      const _chunkPieces = chunkPieces(chunks[c], run.noHyphens === true || pieceKey !== void 0),
-        pieces = _chunkPieces.pieces,
-        fromHyphenator = _chunkPieces.fromHyphenator;
-      for (let i = 0; i < pieces.length; i++) {
-        let after = null;
-        if (i < pieces.length - 1) {
-          after = {
-            penalty: opts.hyphenPenalty,
-            width: run.hyphenWidth,
-            flagged: true,
-            hyphen: fromHyphenator,
-            rp: hyphenRp(run)
-          };
-        } else if (c < chunks.length - 1) {
-          after = {
-            penalty: opts.exHyphenPenalty,
-            width: 0,
-            flagged: true,
-            hyphen: false,
-            rp: 0,
-            rpFromBox: true
-          };
+    pieceCount = 0;
+    if (pieceKey !== void 0) {
+      chunkPieces(token, true);
+      if (pieceCount > 0) pieceAfter[pieceCount - 1] = 0;
+    } else {
+      const noHyphens = run.noHyphens === true;
+      const chunks = splitAfterHyphens(token);
+      for (let c = 0; c < chunks.length; c++) {
+        const first = pieceCount;
+        const fromHyphenator = chunkPieces(chunks[c], noHyphens);
+        for (let q = first; q < pieceCount - 1; q++) {
+          pieceAfter[q] = 1;
+          pieceFromHyphenator[q] = fromHyphenator;
         }
-        plans.push({
-          text: pieces[i],
-          after
-        });
+        if (pieceCount > first) {
+          pieceAfter[pieceCount - 1] = c < chunks.length - 1 ? 2 : 0;
+        }
       }
     }
-    if (plans.length === 0) return;
+    if (pieceCount === 0) return;
     flushPendingSpace(runIndex);
+    if (pieceCount === 1 && pieceAfter[0] === 0 && exclusion === null) {
+      const only = pieceText[0];
+      emitBox(makeBox(only, runIndex, measure.width(only, run)), runIndex);
+      return;
+    }
     let acc = "";
     let accWidth = 0;
     let tokenOffset = 0;
-    for (const plan of plans) {
-      acc += plan.text;
+    for (let q = 0; q < pieceCount; q++) {
+      const text = pieceText[q];
+      acc += text;
       const start = tokenOffset;
-      const end = start + plan.text.length;
-      const excludedStart = exclusion === null ? end : Math.max(start, exclusion.start);
-      const excludedEnd = exclusion === null ? start : Math.min(end, exclusion.end);
-      const flowText = excludedStart < excludedEnd ? plan.text.slice(0, excludedStart - start) + plan.text.slice(excludedEnd - start) : plan.text;
-      const boxExclusion = excludedStart < excludedEnd ? {
-        start: excludedStart - start,
-        end: excludedEnd - start
-      } : void 0;
-      tokenOffset = end;
+      const _excludeFlow = excludeFlow(text, start, exclusion),
+        flowText = _excludeFlow.flowText,
+        boxExclusion = _excludeFlow.flowExclusion;
+      tokenOffset = start + text.length;
       const flowPrefix = exclusion === null ? acc : acc.slice(0, Math.max(0, exclusion.start)) + acc.slice(Math.min(acc.length, exclusion.end));
       const prefixWidth = measure.width(flowPrefix, run);
-      const box = makeBox(plan.text, runIndex, prefixWidth - accWidth, flowText, boxExclusion);
+      const box = makeBox(text, runIndex, prefixWidth - accWidth, flowText, boxExclusion);
       accWidth = prefixWidth;
       emitBox(box, runIndex);
-      if (plan.after !== null) {
-        pushPenalty({
-          penalty: plan.after.penalty,
-          width: plan.after.width,
-          flagged: plan.after.flagged,
-          hyphen: plan.after.hyphen,
-          rp: plan.after.rpFromBox === true ? box.rp : plan.after.rp,
-          run: runIndex
-        });
+      const after = pieceAfter[q];
+      if (after === 1) {
+        pushPenalty(opts.hyphenPenalty, run.hyphenWidth, true, pieceFromHyphenator[q], hyphenRp(run), runIndex);
+      } else if (after === 2) {
+        pushPenalty(opts.exHyphenPenalty, 0, true, false, box.rp, runIndex);
       }
     }
   };
@@ -836,15 +895,10 @@ function buildItems(texts, runs, opts, measure) {
     for (const cluster of graphemes(clean)) {
       const cjk = CJK_CHAR.test(cluster);
       const start = tokenOffset;
-      const end = start + cluster.length;
-      const excludedStart = exclusion === null ? end : Math.max(start, exclusion.start);
-      const excludedEnd = exclusion === null ? start : Math.min(end, exclusion.end);
-      const flowText = excludedStart < excludedEnd ? cluster.slice(0, excludedStart - start) + cluster.slice(excludedEnd - start) : cluster;
-      const clusterExclusion = excludedStart < excludedEnd ? {
-        start: excludedStart - start,
-        end: excludedEnd - start
-      } : void 0;
-      tokenOffset = end;
+      const _excludeFlow2 = excludeFlow(cluster, start, exclusion),
+        flowText = _excludeFlow2.flowText,
+        clusterExclusion = _excludeFlow2.flowExclusion;
+      tokenOffset = start + cluster.length;
       const last = groups[groups.length - 1];
       if (!cjk && last !== void 0 && !last.cjk) {
         const previousLength = last.text.length;
@@ -871,7 +925,8 @@ function buildItems(texts, runs, opts, measure) {
       if (prev !== null) {
         const before = prev.group.cjk ? prev.group.text : graphemes(prev.group.text).pop() ?? "";
         const after = group.cjk ? group.text : graphemes(group.text)[0] ?? "";
-        pushPenalty({
+        items.push({
+          type: ItemType.Penalty,
           // Inside a nowrap element every inter-cluster boundary is
           // break-prohibited; the glue still flexes for justification.
           penalty: prev.group.flowText.length > 0 && pieceKey === void 0 && cjkBreakAllowed(before, after) ? 0 : INF_PENALTY,
@@ -914,22 +969,20 @@ function buildItems(texts, runs, opts, measure) {
     }
     const parts = text.split(BREAKABLE_SPLIT);
     let pieceOffset = 0;
-    for (const part of parts) {
+    for (let pi = 0; pi < parts.length; pi++) {
+      const part = parts[pi];
       if (part.length === 0) continue;
       const partStart = pieceOffset;
-      const partEnd = partStart + part.length;
-      pieceOffset = partEnd;
-      const exclusion = piece.flowExclusion;
-      const overlap = exclusion !== void 0 && exclusion.start < partEnd && exclusion.end > partStart ? {
-        start: Math.max(0, exclusion.start - partStart),
-        end: Math.min(part.length, exclusion.end - partStart)
-      } : null;
-      if (BREAKABLE_SPACE.test(part[0])) {
+      pieceOffset = partStart + part.length;
+      if ((pi & 1) === 1) {
         if (hasBox) {
           pendingSpaceRun = run;
           pendingLeadingSpace = !hasFlowBox;
         }
-      } else if (CJK_CHAR.test(part)) {
+        continue;
+      }
+      const overlap = clipExclusion(piece.flowExclusion, partStart, part.length);
+      if (mayBeCJK(part) && CJK_CHAR.test(part)) {
         pushCJKToken(part, run, overlap);
       } else {
         pushWord(part, run, overlap);
@@ -954,14 +1007,7 @@ function buildItems(texts, runs, opts, measure) {
   pieceKey = void 0;
   piecePaintedStart = false;
   piecePaintedEnd = false;
-  pushPenalty({
-    penalty: INF_PENALTY,
-    width: 0,
-    flagged: false,
-    hyphen: false,
-    rp: 0,
-    run: 0
-  });
+  pushPenalty(INF_PENALTY, 0, false, false, 0, 0);
   items.push({
     type: ItemType.Glue,
     width: 0,
@@ -970,14 +1016,7 @@ function buildItems(texts, runs, opts, measure) {
     shrink: 0,
     run: 0
   });
-  pushPenalty({
-    penalty: -INF_PENALTY,
-    width: 0,
-    flagged: false,
-    hyphen: false,
-    rp: 0,
-    run: 0
-  });
+  pushPenalty(-INF_PENALTY, 0, false, false, 0, 0);
   return withSums(items, runs);
 }
 function withSums(items, runs) {
@@ -1229,6 +1268,9 @@ function renderedEndingWidth(para, widths, end, minWidth) {
   const flexY = trackY + (cumExpY[b] - cumExpY[start]);
   return endingFloorRatio(need, glueOnly, flexY, maxEndingStretch(minWidth)) !== null ? L + need : L;
 }
+var slotOf = new Int32Array(0);
+var slotStamp = new Int32Array(0);
+var stamp = 0;
 function attempt(para, widths, opts, mode) {
   const tolerance = mode.tolerance,
     allowHyphens = mode.hyphens,
@@ -1245,18 +1287,36 @@ function attempt(para, widths, opts, mode) {
     cumTrackY = para.cumTrackY,
     firstBoxAfter = para.firstBoxAfter;
   const n = items.length;
+  const lpAdjAt = (start, line) => {
+    const it = items[start];
+    if (it === void 0 || it.type !== ItemType.Box) return 0;
+    return line === 0 ? it.lpFirst : it.lp;
+  };
+  const firstStart = firstBoxAfter[0];
   let active = {
     item: -1,
-    start: firstBoxAfter[0],
+    start: firstStart,
     line: 0,
     fitness: Fitness.Decent,
     flagged: false,
     overfull: false,
     totalDemerits: 0,
     prev: null,
-    next: null
+    next: null,
+    lpAdj: lpAdjAt(firstStart, 0),
+    lineW: lineWidthAt(widths, 0)
   };
-  const candidates = /* @__PURE__ */new Map();
+  let candN = 0;
+  const candFrom = [];
+  const candFit = [];
+  const candDem = [];
+  const candOver = [];
+  const cap = 4 * (n + 2);
+  if (slotOf.length < cap || stamp > 2147483647 - cap) {
+    slotOf = new Int32Array(cap);
+    slotStamp = new Int32Array(cap);
+    stamp = 0;
+  }
   for (let b = 0; b < n; b++) {
     const it = items[b];
     let p;
@@ -1279,7 +1339,15 @@ function attempt(para, widths, opts, mode) {
     }
     const rp = breakRp(items, b);
     const forced = it.type === ItemType.Penalty && it.penalty <= -INF_PENALTY;
-    candidates.clear();
+    const wB = cumW[b];
+    const yB = cumY[b];
+    const yFilB = cumYfil[b];
+    const zB = cumZ[b];
+    const eyB = cumExpY[b];
+    const ezB = cumExpZ[b];
+    const tyB = cumTrackY[b];
+    candN = 0;
+    stamp++;
     let bestDead = null;
     let bestDeadOver = Infinity;
     let prevLink = null;
@@ -1287,16 +1355,13 @@ function attempt(para, widths, opts, mode) {
     while (node !== null) {
       const next = node.next;
       const start = node.start;
-      let L = cumW[b] - cumW[start] + penWidth;
-      const startItem = items[start];
-      if (startItem !== void 0 && startItem.type === ItemType.Box) {
-        L -= node.line === 0 ? startItem.lpFirst : startItem.lp;
-      }
+      let L = wB - cumW[start] + penWidth;
+      L -= node.lpAdj;
       L -= rp;
-      const W = lineWidthAt(widths, node.line);
-      const Y = cumY[b] - cumY[start] + (cumExpY[b] - cumExpY[start]);
-      const Yfil = cumYfil[b] - cumYfil[start];
-      const Z = cumZ[b] - cumZ[start] + (cumExpZ[b] - cumExpZ[start]);
+      const W = node.lineW;
+      const Y = yB - cumY[start] + (eyB - cumExpY[start]);
+      const Yfil = yFilB - cumYfil[start];
+      const Z = zB - cumZ[start] + (ezB - cumExpZ[start]);
       let r;
       if (L < W) r = Yfil > 0 ? 0 : Y > 0 ? (W - L) / Y : Infinity;else if (L > W) r = Z > 0 ? (L - W) / -Z : -Infinity;else r = 0;
       if (r >= -1) {
@@ -1312,9 +1377,9 @@ function attempt(para, widths, opts, mode) {
           if (need <= 0) {
             bad = 0;
           } else {
-            const trackY = cumTrackY[b] - cumTrackY[start];
-            const glueOnly = Math.max(0, cumY[b] - cumY[start] - trackY);
-            const flexY = trackY + (cumExpY[b] - cumExpY[start]);
+            const trackY = tyB - cumTrackY[start];
+            const glueOnly = Math.max(0, yB - cumY[start] - trackY);
+            const flexY = trackY + (eyB - cumExpY[start]);
             const rFloor = endingFloorRatio(need, glueOnly, flexY, maxEndingStretch(opts.lastLineMinWidth));
             filReachable = rFloor !== null;
             filFitness = rFloor !== null ? fitness(false, 100 * rFloor * rFloor * rFloor) : Fitness.Decent;
@@ -1333,14 +1398,20 @@ function attempt(para, widths, opts, mode) {
           if (forced && b === n - 1 && node.flagged) d += opts.finalHyphenDemerits;
           const total = node.totalDemerits + d;
           const key = node.line * 4 + fit;
-          const existing = candidates.get(key);
-          if (existing === void 0 || total < existing.totalDemerits) {
-            candidates.set(key, {
-              from: node,
-              fitness: fit,
-              totalDemerits: total,
-              overfull: false
-            });
+          const slot = slotStamp[key] === stamp ? slotOf[key] : -1;
+          if (slot < 0) {
+            slotStamp[key] = stamp;
+            slotOf[key] = candN;
+            candFrom[candN] = node;
+            candFit[candN] = fit;
+            candDem[candN] = total;
+            candOver[candN] = false;
+            candN++;
+          } else if (total < candDem[slot]) {
+            candFrom[slot] = node;
+            candFit[slot] = fit;
+            candDem[slot] = total;
+            candOver[slot] = false;
           }
         }
       }
@@ -1356,27 +1427,30 @@ function attempt(para, widths, opts, mode) {
       }
       node = next;
     }
-    if (rescue && active === null && candidates.size === 0 && bestDead !== null) {
-      candidates.set(bestDead.line * 4 + Fitness.Decent, {
-        from: bestDead,
-        fitness: Fitness.Decent,
-        totalDemerits: bestDead.totalDemerits,
-        overfull: bestDeadOver > 0
-      });
+    if (rescue && active === null && candN === 0 && bestDead !== null) {
+      candFrom[0] = bestDead;
+      candFit[0] = Fitness.Decent;
+      candDem[0] = bestDead.totalDemerits;
+      candOver[0] = bestDeadOver > 0;
+      candN = 1;
     }
-    if (candidates.size > 0) {
+    if (candN > 0) {
       const start = firstBoxAfter[b + 1];
-      for (const cand of candidates.values()) {
+      for (let q = 0; q < candN; q++) {
+        const from = candFrom[q];
+        const line = from.line + 1;
         const fresh = {
           item: b,
           start,
-          line: cand.from.line + 1,
-          fitness: cand.fitness,
+          line,
+          fitness: candFit[q],
           flagged,
-          overfull: cand.overfull,
-          totalDemerits: cand.totalDemerits,
-          prev: cand.from,
-          next: active
+          overfull: candOver[q],
+          totalDemerits: candDem[q],
+          prev: from,
+          next: active,
+          lpAdj: lpAdjAt(start, line),
+          lineW: lineWidthAt(widths, line)
         };
         active = fresh;
       }
@@ -3034,5 +3108,5 @@ function fontProtrusion(familyList) {
   return id === void 0 ? void 0 : TABLES[id];
 }
 export { CJK_CHAR, Fitness, INF_BAD, INF_PENALTY, ItemType, UNDERFULL_RATIO, badness, breakParagraph, breakRp, buildItems, cjkBreakAllowed, composeProtrusion, defaultBreakOptions, defaultBuildOptions, demerits, demeritsUncapped, fitness, fontProtrusion, graphemes, hangingPunctuation, kinsokuNotAtLineEnd, kinsokuNotAtLineStart, latinProtrusion, layoutLines, lineText, lineWidthAt, maxEndingStretch, protrusionCodes, textMakesBox, withSums };
-//# sourceMappingURL=chunk-SNOJHREQ.js.map
-//# sourceMappingURL=chunk-SNOJHREQ.js.map
+//# sourceMappingURL=chunk-GGFAIDOO.js.map
+//# sourceMappingURL=chunk-GGFAIDOO.js.map

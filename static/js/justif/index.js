@@ -1,5 +1,5 @@
-import { composeProtrusion, latinProtrusion, defaultBuildOptions, breakParagraph, layoutLines, defaultBreakOptions, ItemType, CJK_CHAR, graphemes, fontProtrusion, textMakesBox, buildItems } from './chunk-SNOJHREQ.js';
-export { composeProtrusion, fontProtrusion, hangingPunctuation, kinsokuNotAtLineEnd, kinsokuNotAtLineStart, latinProtrusion } from './chunk-SNOJHREQ.js';
+import { composeProtrusion, latinProtrusion, defaultBuildOptions, breakParagraph, layoutLines, graphemes, defaultBreakOptions, ItemType, CJK_CHAR, fontProtrusion, buildItems, textMakesBox } from './chunk-GGFAIDOO.js';
+export { composeProtrusion, fontProtrusion, hangingPunctuation, kinsokuNotAtLineEnd, kinsokuNotAtLineStart, latinProtrusion } from './chunk-GGFAIDOO.js';
 
 // src/dom/measure.ts
 function fontSpecOf(style) {
@@ -33,9 +33,11 @@ function fontSpecOf(style) {
     numeric: computed("font-variant-numeric"),
     variantPosition: computed("font-variant-position"),
     direction: style.direction === "rtl" ? "rtl" : "ltr",
-    key: ""
+    key: "",
+    needsDomMeasurement: false
   };
   spec.key = [spec.style, spec.weight, spec.sizePx, spec.family, spec.letterSpacingPx, spec.wordSpacingPx, spec.stretch, spec.variationSettings, spec.variantAlternates, spec.variantCaps, spec.variantEastAsian, spec.variantEmoji, spec.ligatures, spec.featureSettings, spec.numeric, spec.variantPosition].join("|");
+  spec.needsDomMeasurement = spec.variantCaps !== "normal" || spec.variantAlternates !== "normal" || spec.variantEastAsian !== "normal" || spec.variantEmoji !== "normal" || spec.ligatures !== "normal" || spec.featureSettings !== "normal" || spec.numeric !== "normal" || spec.variantPosition !== "normal";
   return spec;
 }
 function ctxFontOf(spec) {
@@ -104,7 +106,7 @@ function applyFontSpec(el, spec) {
   el.style.setProperty("font-feature-settings", spec.featureSettings);
 }
 function requiresDomMeasurement(spec) {
-  return spec.variantCaps !== "normal" || spec.variantAlternates !== "normal" || spec.variantEastAsian !== "normal" || spec.variantEmoji !== "normal" || spec.ligatures !== "normal" || spec.featureSettings !== "normal" || spec.numeric !== "normal" || spec.variantPosition !== "normal";
+  return spec.needsDomMeasurement;
 }
 function supportsSpec(spec) {
   if (spec.stretch !== "100%" && spec.stretch !== "normal") return false;
@@ -113,6 +115,31 @@ function supportsSpec(spec) {
 }
 var widthCache = /* @__PURE__ */new Map();
 var domWidthCache = /* @__PURE__ */new Map();
+var MAX_CACHED_WIDTHS = 15e4;
+var cachedWidths = 0;
+function trimWidthCaches() {
+  for (const cache2 of [widthCache, domWidthCache]) {
+    for (const _ref of cache2) {
+      const key = _ref[0];
+      const perFont = _ref[1];
+      const drop = perFont.size >> 1;
+      if (drop === 0) {
+        if (perFont.size === 0) cache2.delete(key);
+        continue;
+      }
+      let dropped = 0;
+      for (const text of perFont.keys()) {
+        if (dropped >= drop) break;
+        perFont.delete(text);
+        dropped++;
+      }
+      cachedWidths -= dropped;
+    }
+  }
+}
+function noteCachedWidth() {
+  if (++cachedWidths > MAX_CACHED_WIDTHS) trimWidthCaches();
+}
 var pendingDomWidths = /* @__PURE__ */new Map();
 var collectingDomWidths = false;
 var segmenter;
@@ -145,6 +172,7 @@ function measureCanvasWidth(text, spec) {
     }
   }
   perFont.set(text, width);
+  noteCachedWidth();
   return width;
 }
 function cachedDomWidth(text, spec) {
@@ -170,9 +198,9 @@ function flushDomWidths() {
   const host = document.createElement("div");
   host.style.cssText = "position:absolute;left:-100000px;top:0;visibility:hidden;pointer-events:none;white-space:pre;width:max-content;contain:layout style paint;";
   const probes = [];
-  for (const _ref of pendingDomWidths.values()) {
-    const spec = _ref.spec;
-    const texts = _ref.texts;
+  for (const _ref2 of pendingDomWidths.values()) {
+    const spec = _ref2.spec;
+    const texts = _ref2.texts;
     let perFont = domWidthCache.get(spec.key);
     if (perFont === void 0) {
       perFont = /* @__PURE__ */new Map();
@@ -182,6 +210,7 @@ function flushDomWidths() {
       if (perFont.has(text)) continue;
       if (text.length === 0) {
         perFont.set(text, 0);
+        noteCachedWidth();
         continue;
       }
       const span = document.createElement("span");
@@ -201,11 +230,12 @@ function flushDomWidths() {
   pendingDomWidths.clear();
   document.body.append(host);
   try {
-    for (const _ref2 of probes) {
-      const span = _ref2.span;
-      const text = _ref2.text;
-      const spec = _ref2.spec;
+    for (const _ref3 of probes) {
+      const span = _ref3.span;
+      const text = _ref3.text;
+      const spec = _ref3.spec;
       domWidthCache.get(spec.key).set(text, span.getBoundingClientRect().width);
+      noteCachedWidth();
     }
   } finally {
     host.remove();
@@ -255,6 +285,7 @@ function isMonospace(spec) {
 function clearMeasureCache() {
   widthCache.clear();
   domWidthCache.clear();
+  cachedWidths = 0;
   pendingDomWidths.clear();
   bearingCache.clear();
   currentKey = "";
@@ -498,6 +529,43 @@ function paintedInlineEdges(style, direction) {
   };
   return shadowPaintedEdges(style.boxShadow, direction);
 }
+function hardBreakBailReason(elStyle) {
+  if (elStyle.clear !== "none") return `<br> with clear: ${elStyle.clear}`;
+  if (elStyle.display !== "inline" || elStyle.float !== "none" || elStyle.position !== "static" && elStyle.position !== "relative") {
+    return "non-inline-flow <br> (display/float/position)";
+  }
+  return null;
+}
+function inlineInsets(elStyle, direction) {
+  const rtl = direction === "rtl";
+  return {
+    start: (parseFloat(rtl ? elStyle.paddingRight : elStyle.paddingLeft) || 0) + (parseFloat(rtl ? elStyle.borderRightWidth : elStyle.borderLeftWidth) || 0),
+    end: (parseFloat(rtl ? elStyle.paddingLeft : elStyle.paddingRight) || 0) + (parseFloat(rtl ? elStyle.borderLeftWidth : elStyle.borderRightWidth) || 0)
+  };
+}
+function inlineBailReason(el, elStyle, paragraphStyle, padded) {
+  const name = el.tagName.toLowerCase();
+  if (elStyle.display !== "inline" || elStyle.float !== "none" || elStyle.position !== "static" && elStyle.position !== "relative") {
+    return `non-inline-flow <${name}> (display/float/position)`;
+  }
+  if (MARGIN_PROPS.some(prop => (parseFloat(elStyle[prop]) || 0) !== 0)) {
+    return `inline <${name}> has a horizontal margin`;
+  }
+  const decorationBreak = elStyle.getPropertyValue("box-decoration-break") || elStyle.getPropertyValue("-webkit-box-decoration-break");
+  if (padded && decorationBreak === "clone") {
+    return `box-decoration-break: clone on padded <${name}>`;
+  }
+  if (elStyle.textTransform !== "none") {
+    return `text-transform: ${elStyle.textTransform} on <${name}>`;
+  }
+  if (elStyle.direction !== paragraphStyle.direction || elStyle.unicodeBidi !== "normal" && elStyle.unicodeBidi !== "isolate") {
+    return `direction/unicode-bidi override on <${name}>`;
+  }
+  if (elStyle.whiteSpace !== "normal" && elStyle.whiteSpace !== "nowrap") {
+    return `white-space: ${elStyle.whiteSpace} on <${name}>`;
+  }
+  return null;
+}
 function firstLetterRange(text) {
   const punctuation = /^[\p{Ps}\p{Pe}\p{Pi}\p{Pf}\p{Po}]$/u;
   const clusters = graphemes(text);
@@ -551,9 +619,9 @@ function firstLetterStyle(style) {
   return FIRST_LETTER_PROPERTIES.map(property => [property, style.getPropertyValue(property)]).filter(entry => entry[1] !== "");
 }
 function firstLetterInnerStyle(style, paragraph) {
-  return FIRST_LETTER_INNER_PROPERTIES.map(property => [property, style.getPropertyValue(property)]).filter(_ref3 => {
-    let property = _ref3[0],
-      value = _ref3[1];
+  return FIRST_LETTER_INNER_PROPERTIES.map(property => [property, style.getPropertyValue(property)]).filter(_ref4 => {
+    let property = _ref4[0],
+      value = _ref4[1];
     return value !== "" && value !== paragraph.getPropertyValue(property);
   });
 }
@@ -652,7 +720,101 @@ function floatedFirstLetter(p, paragraphStyle, style, floatSide, text, span) {
     style: firstLetterStyle(style)
   };
 }
-function floatDetailsOf(p, text, paragraphStyle, fragmentCount) {
+var RULES_PER_PARAGRAPH = 24;
+function beginScanBatch(paragraphCount) {
+  return {
+    firstLetterRoots: /* @__PURE__ */new Map(),
+    ruleBudget: paragraphCount * RULES_PER_PARAGRAPH
+  };
+}
+function endScanBatch(batch) {
+  batch.firstLetterRoots.clear();
+}
+var MAX_RULE_DEPTH = 12;
+function rulesMentionFirstLetter(rules, depth) {
+  if (depth > MAX_RULE_DEPTH) return true;
+  for (let i = 0; i < rules.length; i += 1) {
+    const rule = rules[i];
+    if (rule === void 0) continue;
+    if (rule.selectorText !== void 0 && rule.selectorText.includes("first-letter")) {
+      return true;
+    }
+    const imported = rule.styleSheet;
+    if (imported != null && sheetMentionsFirstLetter(imported, depth + 1)) return true;
+    const nested = rule.cssRules;
+    if (nested != null && rulesMentionFirstLetter(nested, depth + 1)) return true;
+  }
+  return false;
+}
+function sheetMentionsFirstLetter(sheet, depth) {
+  let rules;
+  try {
+    rules = sheet.cssRules;
+  } catch {
+    return true;
+  }
+  return rulesMentionFirstLetter(rules, depth);
+}
+function rootMentionsFirstLetter(root) {
+  try {
+    const sheets = root.styleSheets;
+    for (let i = 0; i < sheets.length; i += 1) {
+      const sheet = sheets[i];
+      if (sheet !== void 0 && sheetMentionsFirstLetter(sheet, 0)) return true;
+    }
+    const adopted = root.adoptedStyleSheets;
+    if (adopted !== void 0) {
+      for (let i = 0; i < adopted.length; i += 1) {
+        const sheet = adopted[i];
+        if (sheet !== void 0 && sheetMentionsFirstLetter(sheet, 0)) return true;
+      }
+    }
+    return false;
+  } catch {
+    return true;
+  }
+}
+function countRules(root) {
+  let total = 0;
+  try {
+    const sheets = root.styleSheets;
+    for (let i = 0; i < sheets.length; i += 1) {
+      total += sheets[i].cssRules.length;
+    }
+    const adopted = root.adoptedStyleSheets;
+    if (adopted !== void 0) {
+      for (let i = 0; i < adopted.length; i += 1) {
+        total += adopted[i].cssRules.length;
+      }
+    }
+  } catch {
+    return null;
+  }
+  return total;
+}
+function rootMayHaveFirstLetterRule(batch, root) {
+  const cached = batch.firstLetterRoots.get(root);
+  if (cached !== void 0) return cached;
+  const rules = countRules(root);
+  const answer = rules === null || rules > batch.ruleBudget || rootMentionsFirstLetter(root);
+  batch.firstLetterRoots.set(root, answer);
+  return answer;
+}
+function mayHaveFirstLetterRule(p, batch) {
+  if (batch === void 0) return true;
+  if (p.assignedSlot !== null) return true;
+  const doc = p.ownerDocument;
+  const root = p.getRootNode();
+  if (root === doc) return rootMayHaveFirstLetterRule(batch, doc);
+  const shadowRoot = doc.defaultView?.ShadowRoot;
+  if (shadowRoot === void 0 || !(root instanceof shadowRoot)) return true;
+  return rootMayHaveFirstLetterRule(batch, root) ||
+  // The host document reaches into the shadow tree with
+  // `::part(x)::first-letter`.
+  rootMayHaveFirstLetterRule(batch, doc);
+}
+function floatDetailsOf(p, text, paragraphStyle, fragmentCount, batch) {
+  if (!mayHaveFirstLetterRule(p, batch)) return null;
   const view = p.ownerDocument.defaultView;
   if (view === null) return null;
   let style;
@@ -703,7 +865,7 @@ function floatInlineSizeOf(p) {
   }
   return floatIntrusionOf(p)?.inlineSize ?? null;
 }
-function readParagraph(p) {
+function readParagraph(p, batch) {
   const view = p.ownerDocument.defaultView;
   if (view === null) return "detached from its document";
   const cs = view.getComputedStyle(p);
@@ -718,10 +880,11 @@ function readParagraph(p) {
   const keyToIndex = /* @__PURE__ */new Map();
   const indexSpec = style => {
     const spec = fontSpecOf(style);
-    const existing = keyToIndex.get(spec.key);
+    const dedupeKey = `${spec.key}|${spec.hyphens}`;
+    const existing = keyToIndex.get(dedupeKey);
     if (existing !== void 0) return existing;
     specs.push(spec);
-    keyToIndex.set(spec.key, specs.length - 1);
+    keyToIndex.set(dedupeKey, specs.length - 1);
     return specs.length - 1;
   };
   const baseSpec = indexSpec(cs);
@@ -729,6 +892,45 @@ function readParagraph(p) {
   const hardBreaks = [];
   let skip = null;
   let nextAtomicKey = 0;
+  const attachInlineExtras = (el, before, insets, padded, painted) => {
+    if (!padded && !painted.start && !painted.end) return null;
+    const inside = runs.slice(before);
+    let firstBoxAt = -1;
+    let lastBoxAt = -1;
+    for (let i = 0; i < inside.length; i++) {
+      if (!textMakesBox(inside[i].text)) continue;
+      if (firstBoxAt < 0) firstBoxAt = i;
+      lastBoxAt = i;
+    }
+    if (padded) {
+      if (firstBoxAt < 0) return `padded <${el.tagName.toLowerCase()}> with no text content`;
+      const first = runs[before];
+      const last = runs[runs.length - 1];
+      first.padStartPx = (first.padStartPx ?? 0) + insets.start;
+      last.padEndPx = (last.padEndPx ?? 0) + insets.end;
+      last.padEndOwner = el;
+    }
+    if ((painted.start || painted.end) && firstBoxAt >= 0) {
+      if (painted.start) {
+        let startInset = 0;
+        for (let i = 0; i <= firstBoxAt; i++) {
+          startInset += inside[i].padStartPx ?? 0;
+        }
+        const firstBoxRun = inside[firstBoxAt];
+        firstBoxRun.boxStartProtrusionPx = startInset;
+        firstBoxRun.boxStartProtrusionOwner = el;
+      }
+      if (painted.end) {
+        let endInset = 0;
+        for (let i = lastBoxAt; i < inside.length; i++) {
+          endInset += inside[i].padEndPx ?? 0;
+        }
+        inside[inside.length - 1].boxEndProtrusionPx = endInset;
+        inside[lastBoxAt].boxEndProtrusionOwner = el;
+      }
+    }
+    return null;
+  };
   const walk = (node, chain, spec, atomicKey, floatInnerStyle) => {
     let adjacentTextRun = null;
     for (let child = node.firstChild; child !== null; child = child.nextSibling) {
@@ -756,14 +958,8 @@ function readParagraph(p) {
         if (tag === "BR") {
           const elStyle2 = view.getComputedStyle(el);
           if (elStyle2.display === "none") continue;
-          if (elStyle2.clear !== "none") {
-            skip = `<br> with clear: ${elStyle2.clear}`;
-            return;
-          }
-          if (elStyle2.display !== "inline" || elStyle2.float !== "none" || elStyle2.position !== "static" && elStyle2.position !== "relative") {
-            skip = "non-inline-flow <br> (display/float/position)";
-            return;
-          }
+          skip = hardBreakBailReason(elStyle2);
+          if (skip !== null) return;
           hardBreaks.push({
             source: el,
             ancestors: chain,
@@ -776,80 +972,17 @@ function readParagraph(p) {
           return;
         }
         const elStyle = view.getComputedStyle(el);
-        if (elStyle.display !== "inline" || elStyle.float !== "none" || elStyle.position !== "static" && elStyle.position !== "relative") {
-          skip = `non-inline-flow <${el.tagName.toLowerCase()}> (display/float/position)`;
-          return;
-        }
-        if (MARGIN_PROPS.some(prop => (parseFloat(elStyle[prop]) || 0) !== 0)) {
-          skip = `inline <${el.tagName.toLowerCase()}> has a horizontal margin`;
-          return;
-        }
-        const padStart = (parseFloat(direction === "rtl" ? elStyle.paddingRight : elStyle.paddingLeft) || 0) + (parseFloat(direction === "rtl" ? elStyle.borderRightWidth : elStyle.borderLeftWidth) || 0);
-        const padEnd = (parseFloat(direction === "rtl" ? elStyle.paddingLeft : elStyle.paddingRight) || 0) + (parseFloat(direction === "rtl" ? elStyle.borderLeftWidth : elStyle.borderRightWidth) || 0);
-        const padded = padStart > 0 || padEnd > 0;
-        const decorationBreak = elStyle.getPropertyValue("box-decoration-break") || elStyle.getPropertyValue("-webkit-box-decoration-break");
-        if (padded && decorationBreak === "clone") {
-          skip = `box-decoration-break: clone on padded <${el.tagName.toLowerCase()}>`;
-          return;
-        }
-        if (elStyle.textTransform !== "none") {
-          skip = `text-transform: ${elStyle.textTransform} on <${el.tagName.toLowerCase()}>`;
-          return;
-        }
-        if (elStyle.direction !== cs.direction || elStyle.unicodeBidi !== "normal" && elStyle.unicodeBidi !== "isolate") {
-          skip = `direction/unicode-bidi override on <${el.tagName.toLowerCase()}>`;
-          return;
-        }
-        let childKey = atomicKey;
-        if (elStyle.whiteSpace === "nowrap") {
-          childKey = atomicKey ?? nextAtomicKey++;
-        } else if (elStyle.whiteSpace !== "normal") {
-          skip = `white-space: ${elStyle.whiteSpace} on <${el.tagName.toLowerCase()}>`;
-          return;
-        }
+        const insets = inlineInsets(elStyle, direction);
+        const padded = insets.start > 0 || insets.end > 0;
+        skip = inlineBailReason(el, elStyle, cs, padded);
+        if (skip !== null) return;
+        const childKey = elStyle.whiteSpace === "nowrap" ? atomicKey ?? nextAtomicKey++ : atomicKey;
         const before = runs.length;
         const paintedHere = paintedInlineEdges(elStyle, direction);
         walk(el, [...chain, el], indexSpec(elStyle), childKey, firstLetterInnerStyle(elStyle, cs));
         if (skip !== null) return;
-        const inspectEdges = padded || paintedHere.start || paintedHere.end;
-        const inside = inspectEdges ? runs.slice(before) : [];
-        let firstBoxAt = -1;
-        let lastBoxAt = -1;
-        for (let i = 0; i < inside.length; i++) {
-          if (!textMakesBox(inside[i].text)) continue;
-          if (firstBoxAt < 0) firstBoxAt = i;
-          lastBoxAt = i;
-        }
-        if (padded) {
-          if (firstBoxAt < 0) {
-            skip = `padded <${el.tagName.toLowerCase()}> with no text content`;
-            return;
-          }
-          const first = runs[before];
-          const last = runs[runs.length - 1];
-          first.padStartPx = (first.padStartPx ?? 0) + padStart;
-          last.padEndPx = (last.padEndPx ?? 0) + padEnd;
-          last.padEndOwner = el;
-        }
-        if ((paintedHere.start || paintedHere.end) && firstBoxAt >= 0) {
-          if (paintedHere.start) {
-            let startInset = 0;
-            for (let i = 0; i <= firstBoxAt; i++) {
-              startInset += inside[i].padStartPx ?? 0;
-            }
-            const firstBoxRun = inside[firstBoxAt];
-            firstBoxRun.boxStartProtrusionPx = startInset;
-            firstBoxRun.boxStartProtrusionOwner = el;
-          }
-          if (paintedHere.end) {
-            let endInset = 0;
-            for (let i = lastBoxAt; i < inside.length; i++) {
-              endInset += inside[i].padEndPx ?? 0;
-            }
-            inside[inside.length - 1].boxEndProtrusionPx = endInset;
-            inside[lastBoxAt].boxEndProtrusionOwner = el;
-          }
-        }
+        skip = attachInlineExtras(el, before, insets, padded, paintedHere);
+        if (skip !== null) return;
       }
     }
   };
@@ -862,7 +995,7 @@ function readParagraph(p) {
   }
   const fragments = fragmentBoxesOf(p, cs);
   if (!fragments.ok) return fragments.reason;
-  const floatDetails = floatDetailsOf(p, text, cs, fragments.rects.length);
+  const floatDetails = floatDetailsOf(p, text, cs, fragments.rects.length, batch);
   if (typeof floatDetails === "string") return floatDetails;
   const floatIntrusion = floatDetails?.intrusion ?? null;
   if (floatDetails !== null) {
@@ -1009,8 +1142,8 @@ function writeParagraph(p, contents, lineWidths, physicalFitLines) {
   let floatSource = null;
   const segments = contents.filter(content => !("kind" in content));
   const floatBaseStyle = new Map(segments.find(segment => segment.floatedStyle !== void 0)?.floatedStyle ?? []);
-  const floatInnerProperties = new Set(segments.flatMap(segment => (segment.floatedInnerStyle ?? []).map(_ref4 => {
-    let property = _ref4[0];
+  const floatInnerProperties = new Set(segments.flatMap(segment => (segment.floatedInnerStyle ?? []).map(_ref5 => {
+    let property = _ref5[0];
     return property;
   })));
   let lastWasHardBreak = false;
@@ -1062,9 +1195,9 @@ function writeParagraph(p, contents, lineWidths, physicalFitLines) {
         floatSource = doc.createElement("span");
         floatSource.className = "justif-float-source";
         disableTextAutosizing(floatSource);
-        for (const _ref5 of segment.floatedStyle ?? []) {
-          const property = _ref5[0];
-          const value = _ref5[1];
+        for (const _ref6 of segment.floatedStyle ?? []) {
+          const property = _ref6[0];
+          const value = _ref6[1];
           floatSource.style.setProperty(property, value);
         }
         container.append(floatSource);
@@ -1163,6 +1296,120 @@ function fragmentForLine(rects, lineRect, rtl) {
   }
   return best;
 }
+function foreignMutated(entries) {
+  return entries.some(_ref7 => {
+    let el = _ref7.el,
+      seg = _ref7.seg;
+    if (seg === null) return false;
+    const singleText = el.childNodes.length === 1 && el.firstChild?.nodeType === 3 && el.firstChild.data === seg.text;
+    if (!(seg.physicalEndHangPx !== void 0 && seg.physicalEndHangPx > 0)) {
+      return !singleText;
+    }
+    const mid = el.childNodes[1];
+    const hangShape = el.childNodes.length === 3 && el.firstChild?.nodeType === 3 && mid?.nodeType === 1 && mid.className === "justif-hanging-end" && el.lastChild?.nodeType === 3 && el.textContent === seg.text;
+    return !(singleText || hangShape);
+  });
+}
+function measureLineExtent(entries, range) {
+  let rectPx = 0;
+  let modelPx = 0;
+  let ownMargins = 0;
+  let lineRect = null;
+  for (const _ref8 of entries) {
+    const el = _ref8.el;
+    const seg = _ref8.seg;
+    const marginEndEl = _ref8.marginEndEl;
+    let elRect;
+    if (lineRect === null) {
+      elRect = el.getBoundingClientRect();
+      lineRect = elRect;
+    }
+    if (seg === null || seg.edgeTrim.lead === 0 && seg.edgeTrim.trail === 0) {
+      rectPx += (elRect ?? el.getBoundingClientRect()).width;
+    } else {
+      const node = el.firstChild;
+      range.setStart(node, seg.edgeTrim.lead);
+      range.setEnd(node, seg.text.length - seg.edgeTrim.trail);
+      rectPx += range.getBoundingClientRect().width;
+      modelPx += seg.edgeTrim.modelPx;
+    }
+    if (seg !== null && seg.decorPx !== void 0) modelPx += seg.decorPx;
+    modelPx += seg?.marginStartPx ?? 0;
+    const me = parseFloat(marginEndEl.style.marginInlineEnd) || 0;
+    modelPx += me;
+    ownMargins += me;
+  }
+  return {
+    rectPx,
+    modelPx,
+    ownMargins,
+    lineRect
+  };
+}
+function contentEndOf(fragment, paragraphStyle, rtl) {
+  return rtl ? fragment.left + (parseFloat(paragraphStyle?.borderLeftWidth ?? "") || 0) + (parseFloat(paragraphStyle?.paddingLeft ?? "") || 0) : fragment.right - (parseFloat(paragraphStyle?.borderRightWidth ?? "") || 0) - (parseFloat(paragraphStyle?.paddingRight ?? "") || 0);
+}
+function paintedEndOf(entries, endText, range, rtl) {
+  const paintEndEntry = entries[entries.length - 1];
+  let paintRect;
+  if (paintEndEntry.paintEndEl !== void 0) {
+    paintRect = paintEndEntry.paintEndEl.getBoundingClientRect();
+  } else if (paintEndEntry.seg !== null && paintEndEntry.seg.marginEndOwner !== void 0 && paintEndEntry.marginEndEl !== paintEndEntry.el) {
+    paintRect = paintEndEntry.marginEndEl.getBoundingClientRect();
+  } else if (paintEndEntry.seg === null) {
+    paintRect = paintEndEntry.el.getBoundingClientRect();
+  } else {
+    const node = endText?.el.firstChild;
+    const end = endText === void 0 ? 0 : endWithoutCollapsibleSpaces(endText.seg.text);
+    if (node?.nodeType === 3 && end > 0) {
+      range.setStart(node, 0);
+      range.setEnd(node, end);
+      paintRect = range.getBoundingClientRect();
+    } else paintRect = paintEndEntry.el.getBoundingClientRect();
+  }
+  let value = rtl ? -paintRect.left : paintRect.right;
+  if (paintEndEntry.paintEndEl !== void 0 && paintEndEntry.marginEndEl !== paintEndEntry.paintEndEl && paintEndEntry.paintEndEl.contains(paintEndEntry.marginEndEl)) {
+    value -= parseFloat(paintEndEntry.marginEndEl.style.marginInlineEnd) || 0;
+  }
+  return {
+    value,
+    rect: paintRect
+  };
+}
+function distributeAdjustment(textEntries, adjustmentPx) {
+  if (Math.abs(adjustmentPx) <= 1e-3) return [];
+  const spaceCounts = textEntries.map((entry, entryIndex) => Math.max(0, entry.seg.adjustableSpaceCount - (entryIndex === 0 ? entry.seg.edgeTrim.lead : 0)));
+  const spacing = [];
+  const spaces = spaceCounts.reduce((sum, count) => sum + count, 0);
+  if (spaces > 0) {
+    const delta2 = adjustmentPx / spaces;
+    for (let entryIndex = 0; entryIndex < textEntries.length; entryIndex++) {
+      if (spaceCounts[entryIndex] === 0) continue;
+      const entry = textEntries[entryIndex];
+      spacing.push({
+        el: entry.el,
+        property: "word-spacing",
+        px: (parseFloat(entry.el.style.wordSpacing) || 0) - delta2
+      });
+    }
+    return spacing;
+  }
+  const charCounts = textEntries.map((entry, entryIndex) => entry.seg.allowLetterCorrection ? Array.from(entry.seg.text.slice(entryIndex === 0 ? entry.seg.edgeTrim.lead : 0)).length : 0);
+  const chars = charCounts.reduce((sum, count) => sum + count, 0);
+  if (chars === 0) return spacing;
+  const delta = adjustmentPx / chars;
+  for (let entryIndex = 0; entryIndex < textEntries.length; entryIndex++) {
+    if (charCounts[entryIndex] === 0) continue;
+    const entry = textEntries[entryIndex];
+    const computed = entry.el.ownerDocument.defaultView?.getComputedStyle(entry.el);
+    spacing.push({
+      el: entry.el,
+      property: "letter-spacing",
+      px: (parseFloat(computed?.letterSpacing ?? "") || 0) - delta
+    });
+  }
+  return spacing;
+}
 function measureCorrections(pending) {
   const corrections = [];
   const hidden = [];
@@ -1193,56 +1440,21 @@ function measureCorrections(pending) {
     for (let li = 0; li < lineElements.length; li++) {
       const entries = lineElements[li];
       if (entries.length === 0) continue;
-      const mutated = entries.some(_ref6 => {
-        let el = _ref6.el,
-          seg = _ref6.seg;
-        if (seg === null) return false;
-        const singleText = el.childNodes.length === 1 && el.firstChild?.nodeType === 3 && el.firstChild.data === seg.text;
-        if (!(seg.physicalEndHangPx !== void 0 && seg.physicalEndHangPx > 0)) {
-          return !singleText;
-        }
-        const mid = el.childNodes[1];
-        const hangShape = el.childNodes.length === 3 && el.firstChild?.nodeType === 3 && mid?.nodeType === 1 && mid.className === "justif-hanging-end" && el.lastChild?.nodeType === 3 && el.textContent === seg.text;
-        return !(singleText || hangShape);
-      });
-      if (mutated) {
+      if (foreignMutated(entries)) {
         if (!sawInk) {
-          sawInk = entries.some(_ref7 => {
-            let el = _ref7.el;
+          sawInk = entries.some(_ref9 => {
+            let el = _ref9.el;
             return el.getBoundingClientRect().width > 0;
           });
         }
         continue;
       }
       const availableWidth = lineWidths[li] ?? lineWidths[lineWidths.length - 1] ?? 0;
-      let rectPx = 0;
-      let modelPx = 0;
-      let ownMargins = 0;
-      let lineRect = null;
-      for (const _ref8 of entries) {
-        const el = _ref8.el;
-        const seg = _ref8.seg;
-        const marginEndEl = _ref8.marginEndEl;
-        let elRect;
-        if (lineRect === null) {
-          elRect = el.getBoundingClientRect();
-          lineRect = elRect;
-        }
-        if (seg === null || seg.edgeTrim.lead === 0 && seg.edgeTrim.trail === 0) {
-          rectPx += (elRect ?? el.getBoundingClientRect()).width;
-        } else {
-          const node = el.firstChild;
-          range.setStart(node, seg.edgeTrim.lead);
-          range.setEnd(node, seg.text.length - seg.edgeTrim.trail);
-          rectPx += range.getBoundingClientRect().width;
-          modelPx += seg.edgeTrim.modelPx;
-        }
-        if (seg !== null && seg.decorPx !== void 0) modelPx += seg.decorPx;
-        modelPx += seg?.marginStartPx ?? 0;
-        const me = parseFloat(marginEndEl.style.marginInlineEnd) || 0;
-        modelPx += me;
-        ownMargins += me;
-      }
+      const _measureLineExtent = measureLineExtent(entries, range),
+        rectPx = _measureLineExtent.rectPx,
+        modelPx = _measureLineExtent.modelPx,
+        ownMargins = _measureLineExtent.ownMargins,
+        lineRect = _measureLineExtent.lineRect;
       if (rectPx !== 0) sawInk = true;
       const layout = rectPx + modelPx;
       const overflow = layout - availableWidth;
@@ -1259,28 +1471,10 @@ function measureCorrections(pending) {
           adjustmentPx = physicalLayout - (availableWidth - FLOAT_WRAP_SPARE_PX + rightHang - physicalEndHang + deliberateOverflow);
         } else {
           const fragment = fragmentForLine(fragments.rects, lineRect, rtl === true);
-          const contentEnd = rtl ? fragment.left + (parseFloat(paragraphStyle?.borderLeftWidth ?? "") || 0) + (parseFloat(paragraphStyle?.paddingLeft ?? "") || 0) : fragment.right - (parseFloat(paragraphStyle?.borderRightWidth ?? "") || 0) - (parseFloat(paragraphStyle?.paddingRight ?? "") || 0);
+          const contentEnd = contentEndOf(fragment, paragraphStyle, rtl === true);
           const paintEndEntry = entries[entries.length - 1];
-          let paintRect;
-          if (paintEndEntry.paintEndEl !== void 0) {
-            paintRect = paintEndEntry.paintEndEl.getBoundingClientRect();
-          } else if (paintEndEntry.seg !== null && paintEndEntry.seg.marginEndOwner !== void 0 && paintEndEntry.marginEndEl !== paintEndEntry.el) {
-            paintRect = paintEndEntry.marginEndEl.getBoundingClientRect();
-          } else if (paintEndEntry.seg === null) {
-            paintRect = paintEndEntry.el.getBoundingClientRect();
-          } else {
-            const node = endText?.el.firstChild;
-            const end = endText === void 0 ? 0 : endWithoutCollapsibleSpaces(endText.seg.text);
-            if (node?.nodeType === 3 && end > 0) {
-              range.setStart(node, 0);
-              range.setEnd(node, end);
-              paintRect = range.getBoundingClientRect();
-            } else paintRect = paintEndEntry.el.getBoundingClientRect();
-          }
-          let paintedEnd = rtl ? -paintRect.left : paintRect.right;
-          if (paintEndEntry.paintEndEl !== void 0 && paintEndEntry.marginEndEl !== paintEndEntry.paintEndEl && paintEndEntry.paintEndEl.contains(paintEndEntry.marginEndEl)) {
-            paintedEnd -= parseFloat(paintEndEntry.marginEndEl.style.marginInlineEnd) || 0;
-          }
+          const painted = paintedEndOf(entries, endText, range, rtl === true);
+          const paintRect = painted.rect;
           if (paintEndEntry.seg === null && endText !== void 0) {
             const textRect = endText.el.getBoundingClientRect();
             if (Math.abs(paintRect.top - textRect.top) > 0.5 || fragmentForLine(fragments.rects, paintRect, rtl === true) !== fragment) {
@@ -1288,40 +1482,9 @@ function measureCorrections(pending) {
             }
           }
           const desiredEnd = (rtl ? -contentEnd : contentEnd) + rightHang + deliberateOverflow;
-          adjustmentPx = paintedEnd - desiredEnd;
+          adjustmentPx = painted.value - desiredEnd;
         }
-        const correctionTexts = textEntries.map((entry, entryIndex) => entry.seg.text.slice(entryIndex === 0 ? entry.seg.edgeTrim.lead : 0));
-        const spaceCounts = textEntries.map((entry, entryIndex) => Math.max(0, entry.seg.adjustableSpaceCount - (entryIndex === 0 ? entry.seg.edgeTrim.lead : 0)));
-        const spaces = spaceCounts.reduce((sum, count) => sum + count, 0);
-        const spacing = [];
-        if (Math.abs(adjustmentPx) > 1e-3 && spaces > 0) {
-          const delta = adjustmentPx / spaces;
-          for (let entryIndex = 0; entryIndex < textEntries.length; entryIndex++) {
-            if (spaceCounts[entryIndex] === 0) continue;
-            const entry = textEntries[entryIndex];
-            spacing.push({
-              el: entry.el,
-              property: "word-spacing",
-              px: (parseFloat(entry.el.style.wordSpacing) || 0) - delta
-            });
-          }
-        } else if (Math.abs(adjustmentPx) > 1e-3) {
-          const charCounts = correctionTexts.map((text, entryIndex) => textEntries[entryIndex].seg.allowLetterCorrection ? Array.from(text).length : 0);
-          const chars = charCounts.reduce((sum, count) => sum + count, 0);
-          if (chars > 0) {
-            const delta = adjustmentPx / chars;
-            for (let entryIndex = 0; entryIndex < textEntries.length; entryIndex++) {
-              if (charCounts[entryIndex] === 0) continue;
-              const entry = textEntries[entryIndex];
-              const computed = entry.el.ownerDocument.defaultView?.getComputedStyle(entry.el);
-              spacing.push({
-                el: entry.el,
-                property: "letter-spacing",
-                px: (parseFloat(computed?.letterSpacing ?? "") || 0) - delta
-              });
-            }
-          }
-        }
+        const spacing = distributeAdjustment(textEntries, adjustmentPx);
         if (Math.abs(adjustmentPx) > 1e-3 && spacing.length === 0) continue;
         const lineEndEntry = entries[entries.length - 1];
         paraCorrections.push({
@@ -1362,26 +1525,29 @@ function applyCorrections(corrections) {
 // src/dom/segments.ts
 var AUTHOR_NO_BREAK_SPACE = /[\u00A0\u202F]/;
 var DASH_JUNCTION = /[\u002D\u2010-\u2015]/;
+var LIGA_EXPLICITLY_OFF = /["']liga["']\s*(?:0|off)\b/i;
+var CLIG_EXPLICITLY_OFF = /["']clig["']\s*(?:0|off)\b/i;
 function trackingFeatureSettings(spec, active) {
   if (!active || spec.letterSpacingPx !== 0) return void 0;
   if (spec.ligatures === "none" || /\bno-common-ligatures\b/.test(spec.ligatures)) {
     return void 0;
   }
   const settings = spec.featureSettings === "normal" ? [] : [spec.featureSettings];
-  const explicitlyOff = tag => new RegExp(`["']${tag}["']\\s*(?:0|off)\\b`, "i").test(spec.featureSettings);
-  if (!explicitlyOff("liga")) settings.push('"liga" 1');
-  if (!explicitlyOff("clig")) settings.push('"clig" 1');
+  if (!LIGA_EXPLICITLY_OFF.test(spec.featureSettings)) settings.push('"liga" 1');
+  if (!CLIG_EXPLICITLY_OFF.test(spec.featureSettings)) settings.push('"clig" 1');
   return settings.length > 0 ? settings.join(", ") : void 0;
 }
-function spaceWidthIn(spec, runText) {
+function spaceWidthIn(spec, context) {
+  let text;
+  const runText = () => text ?? (text = context());
   if (spec.direction === "rtl") {
-    const probe = /\p{Script=Arabic}/u.test(runText) ? "\u0644" : /\p{Script=Hebrew}/u.test(runText) ? "\u05D0" : null;
+    const probe = /\p{Script=Arabic}/u.test(runText()) ? "\u0644" : /\p{Script=Hebrew}/u.test(runText()) ? "\u05D0" : null;
     if (probe !== null) {
       return measureWidth(`${probe} ${probe}`, spec) - 2 * measureWidth(probe, spec);
     }
   }
   if (requiresDomMeasurement(spec) && spec.variantPosition === "normal") {
-    const letter = /\p{L}/u.exec(runText)?.[0] ?? "n";
+    const letter = /\p{L}/u.exec(runText())?.[0] ?? "n";
     return measureWidth(`${letter} ${letter}`, spec) - 2 * measureWidth(letter, spec);
   }
   return measureWidth(" ", spec);
@@ -1405,9 +1571,34 @@ function runTexts(scan) {
     atomicKey: r.atomicKey
   }));
 }
+var composedBySettings = /* @__PURE__ */new WeakMap();
+function composedForFamily(family, settings) {
+  if (settings === void 0 || !settings.enabled) return null;
+  let composedCache = composedBySettings.get(settings);
+  if (composedCache === void 0) {
+    composedCache = /* @__PURE__ */new Map();
+    composedBySettings.set(settings, composedCache);
+  }
+  const hit = composedCache.get(family);
+  if (hit !== void 0) return hit;
+  const matched = fontProtrusion(family);
+  let tables = null;
+  if (matched !== void 0) {
+    const composed = composeProtrusion({
+      ...latinProtrusion,
+      ...matched
+    }, settings.user, settings.hang);
+    tables = {
+      rest: composed.rest,
+      first: composed.first !== composed.rest ? composed.first : void 0
+    };
+  }
+  composedCache.set(family, tables);
+  return tables;
+}
 function buildRunMetrics(scan, expansion, spacing, protrusion) {
-  const paragraphText = scan.runs.map(r => r.text).join(" ");
-  const baseSpaceWidth = spaceWidthIn(scan.specs[scan.baseSpec], paragraphText);
+  const baseSpec = scan.specs[scan.baseSpec];
+  const baseSpaceWidth = spaceWidthIn(baseSpec, () => scan.runs.map(r => r.text).join(" "));
   const pull = spacing.pull ?? 0.7;
   const samplePcts = [];
   if (expansion !== false && expansion.step > 0) {
@@ -1421,20 +1612,10 @@ function buildRunMetrics(scan, expansion, spacing, protrusion) {
   }
   return scan.runs.map(run => {
     const spec = scan.specs[run.spec];
-    let perFont;
-    let perFontFirst;
-    if (protrusion !== void 0 && protrusion.enabled) {
-      const matched = fontProtrusion(spec.family);
-      if (matched !== void 0) {
-        const composed = composeProtrusion({
-          ...latinProtrusion,
-          ...matched
-        }, protrusion.user, protrusion.hang);
-        perFont = composed.rest;
-        if (composed.first !== composed.rest) perFontFirst = composed.first;
-      }
-    }
-    const naturalSpace = spaceWidthIn(spec, run.text);
+    const perFontTables = composedForFamily(spec.family, protrusion);
+    const perFont = perFontTables?.rest;
+    const perFontFirst = perFontTables?.first;
+    const naturalSpace = spaceWidthIn(spec, () => run.text);
     const spaceWidth = naturalSpace > baseSpaceWidth ? naturalSpace + (baseSpaceWidth - naturalSpace) * pull : naturalSpace;
     const flexWidth = naturalSpace + (Math.min(naturalSpace, baseSpaceWidth) - naturalSpace) * pull;
     const calibration = expansion === false ? NO_EXPANSION : calibrateStretch(spec, 100 + 100 * expansion.max, 100 - 100 * expansion.shrink, samplePcts, run.text);
@@ -1468,7 +1649,7 @@ function buildRunMetrics(scan, expansion, spacing, protrusion) {
       // paragraph set in a mono font owns its margin: it protrudes like any
       // other font (full cell hangs under hangingPunctuation — the
       // typewriter-tradition grid behavior).
-      protrudeInkOnly: isMonospace(spec) && spec.key !== scan.specs[scan.baseSpec].key,
+      protrudeInkOnly: isMonospace(spec) && spec.key !== baseSpec.key,
       protrusion: perFont,
       protrusionFirst: perFontFirst
     };
@@ -1488,7 +1669,7 @@ function buildRenderSegments(scan, runsMetrics, para, lines, lineOffset) {
     const desired = (runIndex, flexOf) => {
       const metrics = runsMetrics[runIndex];
       const spec = scan.specs[scan.runs[runIndex].spec];
-      const widthOffset = metrics.space.width - spaceWidthIn(spec, scan.runs[runIndex].text);
+      const widthOffset = metrics.space.width - spaceWidthIn(spec, () => scan.runs[runIndex].text);
       const pool = flexOf ?? metrics.space;
       const flex = line.glueRatio >= 0 ? pool.stretch : pool.shrink;
       return spec.wordSpacingPx + widthOffset + line.glueRatio * flex;
@@ -1523,7 +1704,7 @@ function buildRenderSegments(scan, runsMetrics, para, lines, lineOffset) {
       const key = Math.round(line.fontStretch * 1e3) / 1e3;
       const ratio = table?.get(key) ?? 1;
       const wordSpacing = fixedNoBreakBox ? spec.wordSpacingPx : desired(run, rigidFlex ?? void 0);
-      const spacePx = spaceWidthIn(spec, scan.runs[run].text) * ratio + wordSpacing;
+      const spacePx = spaceWidthIn(spec, () => scan.runs[run].text) * ratio + wordSpacing;
       const srcRun = scan.runs[run];
       let decorPx;
       if (srcRun.padStartPx !== void 0 && !decorStartSeen.has(run)) {
@@ -1699,9 +1880,9 @@ function buildRenderSegments(scan, runsMetrics, para, lines, lineOffset) {
       pendingJoint = brk.cjk === true ? "wbr" : "space";
     } else pendingJoint = "wbr";
   }
-  for (const _ref9 of lastSegForRun) {
-    const runIndex = _ref9[0];
-    const segIndex = _ref9[1];
+  for (const _ref0 of lastSegForRun) {
+    const runIndex = _ref0[0];
+    const segIndex = _ref0[1];
     const seg = segments[segIndex];
     seg.decorPx = (seg.decorPx ?? 0) + scan.runs[runIndex].padEndPx;
     seg.decorEndOwner = scan.runs[runIndex].padEndOwner;
@@ -1763,6 +1944,217 @@ function withOverrides(defaults, overrides) {
   }
   return merged;
 }
+function describeError(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+function resolveOptions(options) {
+  const breakOpts = withOverrides(defaultBreakOptions, options);
+  const lastLineMinWidth = Math.max(0, Math.min(1, options.lastLineMinWidth ?? 0.33));
+  breakOpts.lastLineMinWidth = lastLineMinWidth;
+  const protrusionUser = typeof options.protrusion === "object" ? {
+    ...options.protrusion
+  } : null;
+  const hangMode = options.hangingPunctuation === false ? false : options.hangingPunctuation === true || options.hangingPunctuation === void 0 ? "first-line" : options.hangingPunctuation;
+  const composed = options.protrusion === false ? null : composeProtrusion(latinProtrusion, protrusionUser, hangMode);
+  const protrusion = composed === null ? false : composed.rest;
+  const protrusionFirst = composed !== null && composed.first !== composed.rest ? composed.first : void 0;
+  const expansion = options.expansion === void 0 ? DEFAULT_EXPANSION : options.expansion;
+  const spacing = withOverrides(DEFAULT_SPACING, options.spacing ?? {});
+  const tracking = options.tracking === false ? false : options.tracking === true || options.tracking === void 0 ? DEFAULT_TRACKING : withOverrides(DEFAULT_TRACKING, options.tracking);
+  let hyphenate = options.hyphenate;
+  if (hyphenate !== void 0) {
+    const inner = hyphenate;
+    const cache2 = /* @__PURE__ */new Map();
+    hyphenate = word => {
+      let pieces = cache2.get(word);
+      if (pieces === void 0) {
+        pieces = inner(word);
+        cache2.set(word, pieces);
+      }
+      return pieces;
+    };
+  }
+  return {
+    breakOpts,
+    // NOTE: JustifyOptions.protrusion/tracking are wider than BuildOptions',
+    // so withOverrides(defaultBuildOptions, options) does NOT typecheck —
+    // keep these explicit.
+    buildOpts: {
+      ...defaultBuildOptions,
+      hyphenate,
+      lastLineFit: Math.max(0, Math.min(1, options.lastLineFit ?? 0)),
+      lastLineMinWidth,
+      hyphenPenalty: options.hyphenPenalty ?? defaultBuildOptions.hyphenPenalty,
+      exHyphenPenalty: options.exHyphenPenalty ?? defaultBuildOptions.exHyphenPenalty,
+      protrusion,
+      protrusionFirst,
+      expansion,
+      tracking,
+      boundaryShrink: spacing.boundaryShrink
+    },
+    lastLineMinWidth,
+    expansion,
+    spacing,
+    protrusionCtx: {
+      enabled: composed !== null,
+      user: protrusionUser,
+      hang: hangMode
+    },
+    hyphenate
+  };
+}
+function beginEnhancement(p, state) {
+  state.original.append(...p.childNodes);
+  state.enhanced = true;
+  p.setAttribute("data-justif", "");
+  if (state.scan.floatIntrusion !== null) p.setAttribute("data-justif-dropcap", "");
+  disableTextAutosizing(p);
+  p.style.textAlign = state.scan.direction === "rtl" ? "right" : "left";
+  if (state.scan.justifyAll) {
+    p.style.textAlignLast = state.scan.direction === "rtl" ? "right" : "left";
+  }
+  p.style.setProperty("hanging-punctuation", "none");
+  p.style.setProperty("overflow-wrap", "normal");
+  p.style.setProperty("word-break", "normal");
+  p.style.setProperty("line-break", "auto");
+  if (state.scan.specs[state.scan.baseSpec].hyphens === "auto") {
+    p.style.setProperty("hyphens", "manual");
+    p.style.setProperty("-webkit-hyphens", "manual");
+  }
+}
+function suppressAutosizingForScan(paragraphs) {
+  const saved = [];
+  const seen = /* @__PURE__ */new WeakSet();
+  const disable = el => {
+    if (seen.has(el)) return;
+    seen.add(el);
+    saved.push({
+      el,
+      style: el.getAttribute("style")
+    });
+    disableTextAutosizing(el);
+  };
+  for (const p of paragraphs) {
+    if (states.get(p)?.enhanced) continue;
+    disable(p);
+    for (const el of p.querySelectorAll("*")) {
+      if (el instanceof HTMLElement) disable(el);
+    }
+  }
+  return () => {
+    for (const _ref1 of saved) {
+      const el = _ref1.el;
+      const style = _ref1.style;
+      restoreStyleAttribute(el, style);
+    }
+  };
+}
+var BLOCKY_TAGS = /^(?:P|DIV|LI|UL|OL|BLOCKQUOTE|H[1-6]|PRE|TABLE|TR|SECTION|ARTICLE|HEADER|FOOTER|FIGURE|FIGCAPTION)$/;
+function plainTextOf(node) {
+  if (node.nodeType === Node.TEXT_NODE) return node.nodeValue ?? "";
+  let out = "";
+  for (let c = node.firstChild; c !== null; c = c.nextSibling) out += plainTextOf(c);
+  if (node.nodeType === Node.ELEMENT_NODE) {
+    const tag = node.tagName;
+    if (tag === "BR") out += "\n";else if (BLOCKY_TAGS.test(tag)) out += "\n\n";
+  }
+  return out;
+}
+var KERN_SAMPLE_MAX = 256;
+function collectFontProbes(scans, hyphenating) {
+  const fontSample = /* @__PURE__ */new Map();
+  for (const scan of scans) {
+    for (const spec of scan.specs) {
+      const font = ctxFontOf(spec);
+      if (!fontSample.has(font)) {
+        fontSample.set(font, {
+          chars: /* @__PURE__ */new Set(),
+          ascii: new Uint8Array(128),
+          kern: ""
+        });
+      }
+    }
+    for (const run of scan.runs) {
+      const s = fontSample.get(ctxFontOf(scan.specs[run.spec]));
+      const text = run.text;
+      for (let i = 0; i < text.length; i++) {
+        const code = text.charCodeAt(i);
+        if (code < 128) {
+          if (s.ascii[code] === 1) continue;
+          s.ascii[code] = 1;
+          s.chars.add(text[i]);
+        } else {
+          const cp = String.fromCodePoint(text.codePointAt(i));
+          s.chars.add(cp);
+          i += cp.length - 1;
+        }
+      }
+      if (s.kern.length < KERN_SAMPLE_MAX) {
+        s.kern += run.text.slice(0, KERN_SAMPLE_MAX - s.kern.length);
+      }
+      if (hyphenating || run.text.includes("\xAD")) s.chars.add("-");
+    }
+  }
+  return [...fontSample].map(_ref10 => {
+    let font = _ref10[0],
+      s = _ref10[1];
+    return {
+      font,
+      sample: s.chars.size === 0 ? " " : [...s.chars].join(""),
+      kernSample: s.kern,
+      baseline: 0,
+      kernBaseline: 0
+    };
+  });
+}
+var clipboardParticipants = /* @__PURE__ */new Set();
+var onDocumentCopy = e => {
+  if (e.clipboardData === null) return;
+  const sel = document.getSelection();
+  if (sel === null || sel.rangeCount === 0 || sel.isCollapsed) return;
+  let touches = false;
+  let authorNbsp = false;
+  for (const participant of clipboardParticipants) {
+    for (const _ref11 of participant.enhanced()) {
+      const p = _ref11[0];
+      const scan = _ref11[1];
+      if (!sel.containsNode(p, true)) continue;
+      touches = true;
+      if (scan.runs.some(r => /[\u00A0\u202F]/.test(r.text))) authorNbsp = true;
+    }
+  }
+  if (!touches) return;
+  const clean = v => {
+    const noWj = v.replace(/\u2060/g, "");
+    return authorNbsp ? noWj : noWj.replace(/\u00A0/g, " ");
+  };
+  const html = document.createElement("div");
+  let plain = "";
+  for (let i = 0; i < sel.rangeCount; i++) {
+    const frag = sel.getRangeAt(i).cloneContents();
+    const walker = document.createTreeWalker(frag, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n !== null; n = walker.nextNode()) {
+      n.nodeValue = clean(n.nodeValue ?? "");
+    }
+    plain += plainTextOf(frag);
+    html.append(frag);
+  }
+  e.clipboardData.setData("text/plain", plain.replace(/\n+$/, ""));
+  e.clipboardData.setData("text/html", html.innerHTML);
+  e.preventDefault();
+};
+function joinClipboardCleanup(participant) {
+  if (clipboardParticipants.size === 0) {
+    document.addEventListener("copy", onDocumentCopy);
+  }
+  clipboardParticipants.add(participant);
+  return () => {
+    if (!clipboardParticipants.delete(participant)) return;
+    if (clipboardParticipants.size === 0) {
+      document.removeEventListener("copy", onDocumentCopy);
+    }
+  };
+}
 function justify(targets, options) {
   if (options === void 0) {
     options = {};
@@ -1777,87 +2169,23 @@ function justify(targets, options) {
   const owner = /* @__PURE__ */Symbol("justif-controller");
   const bailed = /* @__PURE__ */new WeakSet();
   let destroyed = false;
-  const breakOpts = withOverrides(defaultBreakOptions, options);
-  const lastLineMinWidth = Math.max(0, Math.min(1, options.lastLineMinWidth ?? 0.33));
-  breakOpts.lastLineMinWidth = lastLineMinWidth;
-  const protrusionUser = typeof options.protrusion === "object" ? options.protrusion : null;
-  const hangMode = options.hangingPunctuation === false ? false : options.hangingPunctuation === true || options.hangingPunctuation === void 0 ? "first-line" : options.hangingPunctuation;
-  const composed = options.protrusion === false ? null : composeProtrusion(latinProtrusion, protrusionUser, hangMode);
-  const protrusion = composed === null ? false : composed.rest;
-  const protrusionFirst = composed !== null && composed.first !== composed.rest ? composed.first : void 0;
-  const protrusionCtx = {
-    enabled: composed !== null,
-    user: protrusionUser,
-    hang: hangMode
-  };
-  const expansion = options.expansion === void 0 ? DEFAULT_EXPANSION : options.expansion;
-  const spacing = options.spacing ?? DEFAULT_SPACING;
-  const tracking = options.tracking === false ? false : options.tracking === true || options.tracking === void 0 ? DEFAULT_TRACKING : {
-    ...DEFAULT_TRACKING,
-    ...options.tracking
-  };
-  let hyphenate = options.hyphenate;
-  if (hyphenate !== void 0) {
-    const inner = hyphenate;
-    const cache2 = /* @__PURE__ */new Map();
-    hyphenate = word => {
-      let pieces = cache2.get(word);
-      if (pieces === void 0) {
-        pieces = inner(word);
-        cache2.set(word, pieces);
-      }
-      return pieces;
-    };
-  }
-  const buildOpts = {
-    ...defaultBuildOptions,
-    hyphenate,
-    lastLineFit: Math.max(0, Math.min(1, options.lastLineFit ?? 0)),
-    lastLineMinWidth,
-    hyphenPenalty: options.hyphenPenalty ?? defaultBuildOptions.hyphenPenalty,
-    exHyphenPenalty: options.exHyphenPenalty ?? defaultBuildOptions.exHyphenPenalty,
-    protrusion,
-    protrusionFirst,
-    expansion,
-    tracking,
-    boundaryShrink: spacing.boundaryShrink ?? defaultBuildOptions.boundaryShrink
-  };
-  const disableTextAutosizingForScan = () => {
-    const saved = [];
-    const seen = /* @__PURE__ */new WeakSet();
-    const disable = el => {
-      if (seen.has(el)) return;
-      seen.add(el);
-      saved.push({
-        el,
-        style: el.getAttribute("style")
-      });
-      disableTextAutosizing(el);
-    };
-    for (const p of paragraphs) {
-      if (states.get(p)?.enhanced) continue;
-      disable(p);
-      for (const el of p.querySelectorAll("*")) {
-        if (el instanceof HTMLElement) disable(el);
-      }
-    }
-    return () => {
-      for (const _ref0 of saved) {
-        const el = _ref0.el;
-        const style = _ref0.style;
-        restoreStyleAttribute(el, style);
-      }
-    };
-  };
+  const _resolveOptions = resolveOptions(options),
+    breakOpts = _resolveOptions.breakOpts,
+    buildOpts = _resolveOptions.buildOpts,
+    lastLineMinWidth = _resolveOptions.lastLineMinWidth,
+    expansion = _resolveOptions.expansion,
+    spacing = _resolveOptions.spacing,
+    protrusionCtx = _resolveOptions.protrusionCtx,
+    hyphenate = _resolveOptions.hyphenate;
   const scanned = /* @__PURE__ */new Map();
   const pendingSkips = [];
-  const scanParagraph = p => {
+  const scanParagraph = (p, batch) => {
     if (states.get(p)?.enhanced) return true;
     if (bailed.has(p)) return false;
     if (scanned.has(p)) return true;
     let scan;
     try {
-      scan = readParagraph(p);
+      scan = readParagraph(p, batch);
       if (typeof scan !== "string") {
         const bad = scan.specs.find(sp => !supportsSpec(sp));
         if (bad !== void 0) {
@@ -1865,7 +2193,7 @@ function justify(targets, options) {
         }
       }
     } catch (error) {
-      scan = `threw while scanning: ${error instanceof Error ? error.message : String(error)}`;
+      scan = `threw while scanning: ${describeError(error)}`;
     }
     if (typeof scan === "string") {
       bailed.add(p);
@@ -1906,6 +2234,18 @@ function justify(targets, options) {
     append(texts.length, null);
     return parts;
   };
+  const warmDomWidths = entries => {
+    collectDomMeasurements(() => {
+      for (const _ref12 of entries) {
+        const scan = _ref12.scan;
+        const specByKey = _ref12.specByKey;
+        if (!scan.specs.some(requiresDomMeasurement)) continue;
+        try {
+          buildParts(scan, buildRunMetrics(scan, expansion, spacing, protrusionCtx), specByKey);
+        } catch {}
+      }
+    });
+  };
   const prepare = p => {
     if (states.get(p)?.enhanced) {
       scanned.delete(p);
@@ -1932,7 +2272,7 @@ function justify(targets, options) {
       });
     } catch (error) {
       bailed.add(p);
-      emitSkip(p, `threw while measuring: ${error instanceof Error ? error.message : String(error)}`);
+      emitSkip(p, `threw while measuring: ${describeError(error)}`);
       return false;
     }
     return true;
@@ -1941,12 +2281,8 @@ function justify(targets, options) {
     try {
       return patchOne(p);
     } catch (error) {
-      const changed = states.get(p)?.enhanced === true;
-      restore(p);
-      bailed.add(p);
-      emitSkip(p, `threw while rendering: ${error instanceof Error ? error.message : String(error)}`);
       return {
-        changed,
+        changed: bailToNative(p, `threw while rendering: ${describeError(error)}`),
         pending: null
       };
     }
@@ -1965,29 +2301,36 @@ function justify(targets, options) {
       console.error("justif: onRelayout callback threw", err);
     }
   };
-  const patchOne = p => {
+  const ownedState = p => {
     const state = states.get(p);
-    if (state === void 0 || state.owner !== owner) return {
-      changed: false,
-      pending: null
-    };
+    return state !== void 0 && state.owner === owner ? state : void 0;
+  };
+  const dropQueued = p => {
+    pendingWidths.delete(p);
+    pendingCorrections.delete(p);
+    hiddenCorrections.delete(p);
+  };
+  const bailToNative = (p, reason) => {
+    const changed = states.get(p)?.enhanced === true;
+    restore(p);
+    bailed.add(p);
+    emitSkip(p, reason);
+    return changed;
+  };
+  const lineWidthsFor = state => {
     const indentPx = state.scan.textIndentPct !== null ? state.scan.textIndentPct * state.width : state.scan.textIndent;
     const intrusion = state.scan.floatIntrusion;
     const varyingLines = Math.max(indentPx !== 0 ? 1 : 0, intrusion?.lines ?? 0);
-    const rawWidths = varyingLines > 0 ? Array.from({
+    if (varyingLines === 0) return state.width;
+    const widths = Array.from({
       length: varyingLines + 1
-    }, (_, line) => state.width - (line === 0 ? indentPx : 0) - (intrusion !== null && line < intrusion.lines ? intrusion.inlineSize : 0)) : state.width;
-    if (intrusion !== null && Array.isArray(rawWidths) && rawWidths.slice(0, intrusion.lines).some(width => width < MIN_FLOAT_LINE_WIDTH_PX)) {
-      pendingWidths.delete(p);
-      pendingCorrections.delete(p);
-      hiddenCorrections.delete(p);
-      return {
-        changed: restoreManagedOutput(p, state),
-        pending: null
-      };
+    }, (_, line) => state.width - (line === 0 ? indentPx : 0) - (intrusion !== null && line < intrusion.lines ? intrusion.inlineSize : 0));
+    if (intrusion !== null && widths.slice(0, intrusion.lines).some(width => width < MIN_FLOAT_LINE_WIDTH_PX)) {
+      return null;
     }
-    const widths = Array.isArray(rawWidths) ? rawWidths.map(width => Math.max(0, width)) : rawWidths;
-    const paragraphMinWidth = state.scan.justifyAll ? 1 : lastLineMinWidth;
+    return widths.map(width => Math.max(0, width));
+  };
+  const layoutParts = (state, widths, paragraphMinWidth) => {
     const paragraphBreakOpts = paragraphMinWidth === lastLineMinWidth ? breakOpts : {
       ...breakOpts,
       lastLineMinWidth: paragraphMinWidth
@@ -2014,14 +2357,13 @@ function justify(targets, options) {
       const partLineOffset = visualLineCount;
       const partWidths = widthsFrom(partLineOffset);
       const isFinal = part.breakAfter === null;
-      let result = null;
       let lines = [];
       if (part.para.firstBoxAfter[0] !== part.para.items.length) {
         const partBuildOpts = !isFinal && paragraphBuildOpts.lastLineFit !== 0 ? {
           ...paragraphBuildOpts,
           lastLineFit: 0
         } : paragraphBuildOpts;
-        result = breakParagraph(part.para, partWidths, paragraphBreakOpts);
+        const result = breakParagraph(part.para, partWidths, paragraphBreakOpts);
         lines = layoutLines(part.para, result, partWidths, partBuildOpts, isFinal ? priorLastLineFit : void 0);
         rendered.push(...buildRenderSegments(state.scan, state.runsMetrics, part.para, lines, partLineOffset));
         for (const line of lines) lineWidths.push(line.width);
@@ -2054,52 +2396,60 @@ function justify(targets, options) {
         });
       }
     }
-    if (visualLineCount === 1 && state.scan.hardBreaks.length === 0 && onlyLine !== null && onlyResult !== null) {
-      const adjusted = Math.abs(onlyLine.glueRatio) > 1e-9 || Math.abs(onlyLine.trackRatio) > 1e-9 || Math.abs(onlyLine.fontStretch - 100) > 1e-9;
-      const reachedFullWidth = paragraphMinWidth === 1 && (onlyResult.endingMinWidth ?? paragraphMinWidth) >= 1 - 1e-9 && onlyLine.overfull !== true && adjusted;
-      if (!reachedFullWidth) {
-        pendingWidths.delete(p);
-        pendingCorrections.delete(p);
-        hiddenCorrections.delete(p);
-        return {
-          changed: restoreManagedOutput(p, state),
-          pending: null
-        };
-      }
-    }
-    const fingerprint = fingerprintParts.join("|");
-    if (fingerprint === state.lastPatch) return {
+    return {
+      rendered,
+      lineWidths,
+      fingerprint: fingerprintParts.join("|"),
+      visualLineCount,
+      onlyLine,
+      onlyResult
+    };
+  };
+  const oneLineStaysNative = (layout, paragraphMinWidth) => {
+    const onlyLine = layout.onlyLine,
+      onlyResult = layout.onlyResult;
+    if (onlyLine === null || onlyResult === null) return false;
+    const adjusted = Math.abs(onlyLine.glueRatio) > 1e-9 || Math.abs(onlyLine.trackRatio) > 1e-9 || Math.abs(onlyLine.fontStretch - 100) > 1e-9;
+    const reachedFullWidth = paragraphMinWidth === 1 && (onlyResult.endingMinWidth ?? paragraphMinWidth) >= 1 - 1e-9 && onlyLine.overfull !== true && adjusted;
+    return !reachedFullWidth;
+  };
+  const patchOne = p => {
+    const state = ownedState(p);
+    if (state === void 0) return {
       changed: false,
       pending: null
     };
-    state.lastPatch = fingerprint;
-    if (!state.enhanced) {
-      state.original.append(...p.childNodes);
-      state.enhanced = true;
-      p.setAttribute("data-justif", "");
-      if (state.scan.floatIntrusion !== null) p.setAttribute("data-justif-dropcap", "");
-      disableTextAutosizing(p);
-      p.style.textAlign = state.scan.direction === "rtl" ? "right" : "left";
-      if (state.scan.justifyAll) {
-        p.style.textAlignLast = state.scan.direction === "rtl" ? "right" : "left";
-      }
-      p.style.setProperty("hanging-punctuation", "none");
-      p.style.setProperty("overflow-wrap", "normal");
-      p.style.setProperty("word-break", "normal");
-      p.style.setProperty("line-break", "auto");
-      if (state.scan.specs[state.scan.baseSpec].hyphens === "auto") {
-        p.style.setProperty("hyphens", "manual");
-        p.style.setProperty("-webkit-hyphens", "manual");
-      }
+    const widths = lineWidthsFor(state);
+    if (widths === null) {
+      dropQueued(p);
+      return {
+        changed: restoreManagedOutput(p, state),
+        pending: null
+      };
     }
+    const paragraphMinWidth = state.scan.justifyAll ? 1 : lastLineMinWidth;
+    const layout = layoutParts(state, widths, paragraphMinWidth);
+    if (layout.visualLineCount === 1 && state.scan.hardBreaks.length === 0 && oneLineStaysNative(layout, paragraphMinWidth)) {
+      dropQueued(p);
+      return {
+        changed: restoreManagedOutput(p, state),
+        pending: null
+      };
+    }
+    if (layout.fingerprint === state.lastPatch) return {
+      changed: false,
+      pending: null
+    };
+    state.lastPatch = layout.fingerprint;
+    if (!state.enhanced) beginEnhancement(p, state);
     if (state.scan.pinIntrinsicSize && state.scan.lineHeightPx !== null) {
-      p.style.containIntrinsicBlockSize = `auto ${Math.round(visualLineCount * state.scan.lineHeightPx * 1e3) / 1e3}px`;
+      p.style.containIntrinsicBlockSize = `auto ${Math.round(layout.visualLineCount * state.scan.lineHeightPx * 1e3) / 1e3}px`;
     }
     pendingCorrections.delete(p);
     hiddenCorrections.delete(p);
     return {
       changed: true,
-      pending: writeParagraph(p, rendered, lineWidths, intrusion?.lines ?? 0)
+      pending: writeParagraph(p, layout.rendered, layout.lineWidths, state.scan.floatIntrusion?.lines ?? 0)
     };
   };
   const flushPatches = batch => {
@@ -2118,36 +2468,24 @@ function justify(targets, options) {
         const e = measure[i];
         hiddenCorrections.set(e.p, e.pending);
       }
-      for (const _ref1 of invalid) {
-        const index = _ref1.index;
-        const reason = _ref1.reason;
+      for (const _ref13 of invalid) {
+        const index = _ref13.index;
+        const reason = _ref13.reason;
         const e = measure[index];
-        const state = states.get(e.p);
-        if (state === void 0 || state.owner !== owner) continue;
-        pendingWidths.delete(e.p);
-        pendingCorrections.delete(e.p);
-        hiddenCorrections.delete(e.p);
-        const changed = state.enhanced;
-        restore(e.p);
-        bailed.add(e.p);
-        emitSkip(e.p, reason);
-        if (changed) emitRelayout(e.p);
+        if (ownedState(e.p) === void 0) continue;
+        dropQueued(e.p);
+        if (bailToNative(e.p, reason)) emitRelayout(e.p);
       }
     }
   };
   const commit = scannable2 => {
-    collectDomMeasurements(() => {
-      for (const p of scannable2) {
-        const scan = scanned.get(p);
-        if (scan === void 0) continue;
-        if (!scan.specs.some(requiresDomMeasurement)) continue;
-        try {
-          const specByKey = new Map(scan.specs.map(spec => [spec.key, spec]));
-          const runsMetrics = buildRunMetrics(scan, expansion, spacing, protrusionCtx);
-          buildParts(scan, runsMetrics, specByKey);
-        } catch {}
-      }
-    });
+    warmDomWidths(scannable2.flatMap(p => {
+      const scan = scanned.get(p);
+      return scan === void 0 || !scan.specs.some(requiresDomMeasurement) ? [] : [{
+        scan,
+        specByKey: new Map(scan.specs.map(spec => [spec.key, spec]))
+      }];
+    }));
     const batch = [];
     const changed = [];
     for (const p of scannable2) {
@@ -2174,10 +2512,8 @@ function justify(targets, options) {
   const refreshFloatIntrusions = () => {
     let changed = false;
     for (const p of paragraphs) {
-      const state = states.get(p);
-      if (state === void 0 || state.owner !== owner || state.scan.floatIntrusion === null) {
-        continue;
-      }
+      const state = ownedState(p);
+      if (state === void 0 || state.scan.floatIntrusion === null) continue;
       const nextInlineSize = floatInlineSizeOf(p);
       if (nextInlineSize === null) continue;
       if (Math.abs(nextInlineSize - state.scan.floatIntrusion.inlineSize) > 0.05) {
@@ -2194,24 +2530,22 @@ function justify(targets, options) {
   const refreshNativeFloatIntrusions = () => {
     if (destroyed) return false;
     const candidates = paragraphs.flatMap(p => {
-      const state = states.get(p);
-      return state !== void 0 && state.owner === owner && state.scan.floatIntrusion !== null ? [{
+      const state = ownedState(p);
+      return state !== void 0 && state.scan.floatIntrusion !== null ? [{
         p,
         state
       }] : [];
     });
     let changed = false;
-    for (const _ref10 of candidates) {
-      const p = _ref10.p;
-      const state = _ref10.state;
-      pendingWidths.delete(p);
-      pendingCorrections.delete(p);
-      hiddenCorrections.delete(p);
+    for (const _ref14 of candidates) {
+      const p = _ref14.p;
+      const state = _ref14.state;
+      dropQueued(p);
       if (restoreManagedOutput(p, state)) changed = true;
     }
-    for (const _ref11 of candidates) {
-      const p = _ref11.p;
-      const state = _ref11.state;
+    for (const _ref15 of candidates) {
+      const p = _ref15.p;
+      const state = _ref15.state;
       const next = floatIntrusionOf(p, state.scan.runs.map(run => run.text).join(""));
       if (next === null) {
         states.delete(p);
@@ -2236,32 +2570,17 @@ function justify(targets, options) {
     clearMeasureCache();
     clearCalibrationCache();
     reprobeBaselines();
-    const mine = paragraphs.filter(p => states.get(p)?.owner === owner);
+    const mine = paragraphs.filter(p => ownedState(p) !== void 0);
     const widths = new Map(mine.map(p => [p, contentWidthOf(p)]));
-    collectDomMeasurements(() => {
-      for (const p of mine) {
-        const state = states.get(p);
-        if (!state.scan.specs.some(requiresDomMeasurement)) continue;
-        try {
-          const runsMetrics = buildRunMetrics(state.scan, expansion, spacing, protrusionCtx);
-          buildParts(state.scan, runsMetrics, state.specByKey);
-        } catch {}
-      }
-    });
+    warmDomWidths(mine.map(p => states.get(p)));
     const batch = [];
     const changed = [];
     for (const p of mine) {
       const state = states.get(p);
       const width = widths.get(p);
       if (typeof width === "string") {
-        pendingWidths.delete(p);
-        pendingCorrections.delete(p);
-        hiddenCorrections.delete(p);
-        const wasEnhanced = state.enhanced;
-        restore(p);
-        bailed.add(p);
-        emitSkip(p, width);
-        if (wasEnhanced) changed.push(p);
+        dropQueued(p);
+        if (bailToNative(p, width)) changed.push(p);
         continue;
       }
       state.runsMetrics = buildRunMetrics(state.scan, expansion, spacing, protrusionCtx);
@@ -2318,8 +2637,8 @@ function justify(targets, options) {
     const parked = hiddenCorrections.get(el);
     if (parked === void 0) return false;
     hiddenCorrections.delete(el);
-    const s = states.get(el);
-    if (s === void 0 || s.owner !== owner || !s.enhanced) return false;
+    const s = ownedState(el);
+    if (s === void 0 || !s.enhanced) return false;
     pendingCorrections.set(el, parked);
     return true;
   };
@@ -2371,8 +2690,8 @@ function justify(targets, options) {
       const width = pendingWidths.get(el);
       if (width === void 0) continue;
       pendingWidths.delete(el);
-      const state = states.get(el);
-      if (state === void 0 || state.owner !== owner) continue;
+      const state = ownedState(el);
+      if (state === void 0) continue;
       if (Math.abs(width - state.width) < 0.05) continue;
       state.width = width;
       const outcome = safePatch(el);
@@ -2405,51 +2724,14 @@ function justify(targets, options) {
     }
     if (pendingCorrections.size > 0 || pendingWidths.size > 0) scheduleSlice();
   };
-  const onCopy = e => {
-    if (e.clipboardData === null) return;
-    const sel = document.getSelection();
-    if (sel === null || sel.rangeCount === 0 || sel.isCollapsed) return;
-    let touches = false;
-    let authorNbsp = false;
-    for (const p of paragraphs) {
-      const state = states.get(p);
-      if (state === void 0 || state.owner !== owner || !state.enhanced) continue;
-      if (!sel.containsNode(p, true)) continue;
-      touches = true;
-      if (state.scan.runs.some(r => /[\u00A0\u202F]/.test(r.text))) authorNbsp = true;
-    }
-    if (!touches) return;
-    const clean = v => {
-      const noWj = v.replace(/\u2060/g, "");
-      return authorNbsp ? noWj : noWj.replace(/\u00A0/g, " ");
-    };
-    const BLOCKY = /^(?:P|DIV|LI|UL|OL|BLOCKQUOTE|H[1-6]|PRE|TABLE|TR|SECTION|ARTICLE|HEADER|FOOTER|FIGURE|FIGCAPTION)$/;
-    const plainOf = node => {
-      if (node.nodeType === Node.TEXT_NODE) return node.nodeValue ?? "";
-      let out = "";
-      for (let c = node.firstChild; c !== null; c = c.nextSibling) out += plainOf(c);
-      if (node.nodeType === Node.ELEMENT_NODE) {
-        const tag = node.tagName;
-        if (tag === "BR") out += "\n";else if (BLOCKY.test(tag)) out += "\n\n";
+  const leaveClipboardCleanup = options.cleanClipboard === false ? null : joinClipboardCleanup({
+    *enhanced() {
+      for (const p of paragraphs) {
+        const state = ownedState(p);
+        if (state !== void 0 && state.enhanced) yield [p, state.scan];
       }
-      return out;
-    };
-    const html = document.createElement("div");
-    let plain = "";
-    for (let i = 0; i < sel.rangeCount; i++) {
-      const frag = sel.getRangeAt(i).cloneContents();
-      const walker = document.createTreeWalker(frag, NodeFilter.SHOW_TEXT);
-      for (let n = walker.nextNode(); n !== null; n = walker.nextNode()) {
-        n.nodeValue = clean(n.nodeValue ?? "");
-      }
-      plain += plainOf(frag);
-      html.append(frag);
     }
-    e.clipboardData.setData("text/plain", plain.replace(/\n+$/, ""));
-    e.clipboardData.setData("text/html", html.innerHTML);
-    e.preventDefault();
-  };
-  if (options.cleanClipboard !== false) document.addEventListener("copy", onCopy);
+  });
   let observer = null;
   const onFontsLoaded = () => {
     const metricsChanged = probesChanged();
@@ -2458,19 +2740,18 @@ function justify(targets, options) {
   };
   const attachObservers = () => {
     for (const p of paragraphs) {
-      const s = states.get(p);
-      if (s !== void 0 && s.owner === owner) {
+      if (ownedState(p) !== void 0) {
         viewObserver?.observe(p);
         revealObserver?.observe(p);
       }
     }
     if (options.observeResize !== false) {
       observer = createWidthObserver(widths => {
-        for (const _ref12 of widths) {
-          const el = _ref12[0];
-          const width = _ref12[1];
-          const state = states.get(el);
-          if (state === void 0 || state.owner !== owner) continue;
+        for (const _ref16 of widths) {
+          const el = _ref16[0];
+          const width = _ref16[1];
+          const state = ownedState(el);
+          if (state === void 0) continue;
           if (Math.abs(width - state.width) < 0.05) {
             pendingWidths.delete(el);
             continue;
@@ -2484,56 +2765,26 @@ function justify(targets, options) {
         }
       });
       for (const p of paragraphs) {
-        const s = states.get(p);
-        if (s !== void 0 && s.owner === owner) observer.observe(p);
+        if (ownedState(p) !== void 0) observer.observe(p);
       }
     }
     document.fonts.addEventListener("loadingdone", onFontsLoaded);
   };
-  const restoreScanStyles = disableTextAutosizingForScan();
+  const restoreScanStyles = suppressAutosizingForScan(paragraphs);
   let scannable;
+  const scanBatch = beginScanBatch(paragraphs.length);
   try {
-    scannable = paragraphs.filter(scanParagraph);
+    scannable = paragraphs.filter(p => scanParagraph(p, scanBatch));
   } finally {
+    endScanBatch(scanBatch);
     restoreScanStyles();
   }
-  for (const _ref13 of pendingSkips) {
-    const p = _ref13.p;
-    const reason = _ref13.reason;
+  for (const _ref17 of pendingSkips) {
+    const p = _ref17.p;
+    const reason = _ref17.reason;
     emitSkip(p, reason);
   }
-  const KERN_SAMPLE_MAX = 256;
-  const fontSample = /* @__PURE__ */new Map();
-  for (const p of scannable) {
-    const scan = scanned.get(p);
-    if (scan === void 0) continue;
-    for (const spec of scan.specs) {
-      const font = ctxFontOf(spec);
-      if (!fontSample.has(font)) fontSample.set(font, {
-        chars: /* @__PURE__ */new Set(),
-        kern: ""
-      });
-    }
-    for (const run of scan.runs) {
-      const s = fontSample.get(ctxFontOf(scan.specs[run.spec]));
-      for (const ch of run.text) s.chars.add(ch);
-      if (s.kern.length < KERN_SAMPLE_MAX) {
-        s.kern += run.text.slice(0, KERN_SAMPLE_MAX - s.kern.length);
-      }
-      if (hyphenate !== void 0 || run.text.includes("\xAD")) s.chars.add("-");
-    }
-  }
-  fontProbes = [...fontSample].map(_ref14 => {
-    let font = _ref14[0],
-      s = _ref14[1];
-    return {
-      font,
-      sample: s.chars.size === 0 ? " " : [...s.chars].join(""),
-      kernSample: s.kern,
-      baseline: 0,
-      kernBaseline: 0
-    };
-  });
+  fontProbes = collectFontProbes(scannable.flatMap(p => scanned.get(p) ?? []), hyphenate !== void 0);
   let ready;
   try {
     commit(scannable);
@@ -2549,7 +2800,7 @@ function justify(targets, options) {
       });
     }
   } catch (error) {
-    ready = Promise.reject(error instanceof Error ? error : new Error(String(error)));
+    ready = Promise.reject(error instanceof Error ? error : new Error(describeError(error)));
   }
   ready.catch(() => {});
   return {
@@ -2569,14 +2820,14 @@ function justify(targets, options) {
       pendingCorrections.clear();
       hiddenCorrections.clear();
       pendingOrder = [];
-      document.removeEventListener("copy", onCopy);
+      leaveClipboardCleanup?.();
       document.fonts.removeEventListener("loadingdone", onFontsLoaded);
       viewObserver?.disconnect();
       revealObserver?.disconnect();
       observer?.disconnect();
       observer = null;
       for (const p of paragraphs) {
-        if (states.get(p)?.owner === owner) restore(p);
+        if (ownedState(p) !== void 0) restore(p);
       }
     }
   };
