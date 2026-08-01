@@ -453,18 +453,12 @@ var hangingPunctuation = {
     l: 1e3,
     r: 1e3
   }, "\u2018\u2019\u201C\u201D\u201A\u201E\u2039\u203A\xAB\xBB"),
-  // Opening brackets (CSS first) — the classic "(1) …" paragraph opener.
-  // Closing brackets stay at their partial values: a fully hung paren at
-  // an arbitrary line end reads as misalignment.
-  "(": {
-    l: 1e3
-  },
-  "[": {
-    l: 1e3
-  },
-  "{": {
-    l: 1e3
-  },
+  // Brackets are deliberately NOT here, on either side. CSS `first` hangs
+  // the whole Ps category, but no print system hangs a bracket more than
+  // slightly: measured in Junicode, a line-start "(" hangs 100‰ of its
+  // advance in Affinity and 249‰ in InDesign, against microtype's generic
+  // 100‰. Leaving them out gives them exactly that ordinary protrusion, the
+  // same depth on every line.
   // Burasage (ぶら下げ組み): the ideographic and fullwidth stops hang fully
   // into the right margin — the classical Japanese newspaper/book setting.
   // Their glyphs sit in the left half of a fullwidth advance, so the ink
@@ -483,13 +477,34 @@ var hangingPunctuation = {
     r: 1e3
   }
 };
+function normalizeHangingPunctuation(hang) {
+  switch (hang) {
+    case false:
+      return "none";
+    case "first-line":
+      return "first-line-and-line-ends";
+    case "all-lines":
+      return "all-line-edges";
+    default:
+      return hang;
+  }
+}
+var flushStarts = Object.fromEntries(Object.entries(hangingPunctuation).filter(_ref => {
+  let codes = _ref[1];
+  return codes.l !== void 0;
+}).map(_ref2 => {
+  let ch = _ref2[0];
+  return [ch, {
+    l: 0
+  }];
+}));
 function applySide(base, overrides, side) {
   const out = {
     ...base
   };
-  for (const _ref of Object.entries(overrides)) {
-    const ch = _ref[0];
-    const codes = _ref[1];
+  for (const _ref3 of Object.entries(overrides)) {
+    const ch = _ref3[0];
+    const codes = _ref3[1];
     const v = codes[side];
     if (v !== void 0) out[ch] = {
       ...out[ch],
@@ -499,12 +514,16 @@ function applySide(base, overrides, side) {
   return out;
 }
 function composeProtrusion(base, user, hang) {
+  const mode = normalizeHangingPunctuation(hang);
   let rest = base;
   let first = base;
-  if (hang !== false) {
+  if (mode !== "none") {
     rest = applySide(base, hangingPunctuation, "r");
-    first = applySide(rest, hangingPunctuation, "l");
-    if (hang === "all-lines") rest = first;
+    first = rest;
+    if (mode !== "line-end-only") {
+      first = applySide(rest, hangingPunctuation, "l");
+      if (mode === "all-line-edges") rest = first;else rest = applySide(rest, flushStarts, "l");
+    }
   }
   if (user !== null) {
     const same = first === rest;
@@ -3111,6 +3130,6 @@ function fontProtrusion(familyList) {
   const id = FAMILY_TO_TABLE[first];
   return id === void 0 ? void 0 : TABLES[id];
 }
-export { CJK_CHAR, Fitness, INF_BAD, INF_PENALTY, ItemType, UNDERFULL_RATIO, badness, breakParagraph, breakRp, buildItems, cjkBreakAllowed, composeProtrusion, defaultBreakOptions, defaultBuildOptions, demerits, demeritsUncapped, fitness, fontProtrusion, graphemes, hangingPunctuation, kinsokuNotAtLineEnd, kinsokuNotAtLineStart, latinProtrusion, layoutLines, lineText, lineWidthAt, maxEndingStretch, protrusionCodes, textMakesBox, withSums };
-//# sourceMappingURL=chunk-2HNIW7VG.js.map
-//# sourceMappingURL=chunk-2HNIW7VG.js.map
+export { CJK_CHAR, Fitness, INF_BAD, INF_PENALTY, ItemType, UNDERFULL_RATIO, badness, breakParagraph, breakRp, buildItems, cjkBreakAllowed, composeProtrusion, defaultBreakOptions, defaultBuildOptions, demerits, demeritsUncapped, fitness, fontProtrusion, graphemes, hangingPunctuation, kinsokuNotAtLineEnd, kinsokuNotAtLineStart, latinProtrusion, layoutLines, lineText, lineWidthAt, maxEndingStretch, normalizeHangingPunctuation, protrusionCodes, textMakesBox, withSums };
+//# sourceMappingURL=chunk-2WL5JIIM.js.map
+//# sourceMappingURL=chunk-2WL5JIIM.js.map

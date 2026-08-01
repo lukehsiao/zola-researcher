@@ -22,6 +22,15 @@ interface TrackingOptions {
     shrink: number;
 }
 
+/**
+ * Full-hanging policy layered over the selected protrusion model. Each name
+ * says which line edges hang fully, in increasing order.
+ *
+ * `"first-line"` and `"all-lines"` are the original spellings of
+ * `"first-line-and-line-ends"` and `"all-line-edges"`, and remain supported.
+ */
+type HangingPunctuationMode = false | "none" | "line-end-only" | "first-line-and-line-ends" | "all-line-edges" | "first-line" | "all-lines";
+
 interface JustifyOptions {
     /** Word splitter, e.g. `hyphenateEnUS` from "justif/hyphenate/en-us".
      * Never called for RTL paragraphs (Arabic joining makes fragment
@@ -63,21 +72,47 @@ interface JustifyOptions {
      * disable.
      */
     lastLineMinWidth?: number;
-    /** true = built-in Latin table; an object merges over it; false disables. */
+    /**
+     * Character protrusion model. `true` (the default) measures each font's
+     * glyph-specific optical alignment by rasterizing its glyphs. `false`
+     * disables character protrusion — and only that: `hangingPunctuation` is an
+     * independent setting, so `false` with hanging left on sets ordinary glyphs
+     * exactly flush while the eligible marks still hang.
+     *
+     * An object selects the fixed table-backed model and supplies
+     * per-character overrides, in thousandths of the character's own advance.
+     * Overrides are merged over the generic Latin table and any matching
+     * hand-tuned per-font table.
+     *
+     * Built-in tables (the generic Latin list plus microtype's per-font configs)
+     * remain as the FALLBACK, used per font wherever the measurement cannot run
+     * — a canvas that will not rasterize or read back, or one the browser will
+     * not shape a run's font-variant in — and for the characters the raster pass
+     * has no candidate for, such as the Arabic and Hebrew stops. They are not
+     * separately selected when `true`; passing an object (including `{}`)
+     * bypasses measurement and uses them directly.
+     */
     protrusion?: boolean | ProtrusionTable;
     /**
-     * Full hanging punctuation: quotes, stops, and opening brackets hang
-     * entirely outside the measure. "first-line" (the DEFAULT, = `true`)
-     * hangs left-edge marks fully only on the paragraph's FIRST line —
-     * mid-paragraph line starts keep their partial microtype protrusion —
-     * while stops and closing quotes hang fully at every line end;
-     * "all-lines" extends the full left hangs to every line (classical
-     * Gutenberg style); `false` disables full hangs, leaving microtype's
-     * partial protrusion only. Requires `protrusion` enabled.
+     * Full-hanging policy, independent of `protrusion`. `"line-end-only"` (the
+     * default) fully hangs eligible punctuation at line ends while line starts
+     * retain optical alignment. `"first-line-and-line-ends"` adds the CSS `first`
+     * model on top of that: the paragraph's opening quote hangs fully and later
+     * line starts set those marks flush. `"all-line-edges"` fully hangs at every
+     * line edge; `"none"` applies only the selected protrusion model.
+     *
+     * Hanging is composed as a protrusion overlay, but the two settings switch
+     * separately: with `protrusion: false` the overlay composes over an empty
+     * base, and with `"none"` the protrusion model applies alone.
+     *
+     * Compatibility: `true` selects the default; `false` selects `"none"`;
+     * `"first-line"` aliases `"first-line-and-line-ends"`; and `"all-lines"`
+     * aliases `"all-line-edges"`.
      */
-    hangingPunctuation?: boolean | "first-line" | "all-lines";
-    /** Glyph expansion limits via the wdth axis; false disables. */
-    expansion?: ExpansionOptions | false;
+    hangingPunctuation?: true | HangingPunctuationMode;
+    /** Glyph expansion limits via the wdth axis; false disables. Fields left out
+     * take their default, like `spacing` and `tracking`. */
+    expansion?: Partial<ExpansionOptions> | false;
     /**
      * Inter-word glue flexibility as fractions of the space width. `pull`
      * (0–1, default 0.7) is the downward pressure on secondary-font spaces
@@ -90,12 +125,12 @@ interface JustifyOptions {
      * never shrinks a space — so by default those gaps stretch but hold
      * their natural width. 1 restores TeX semantics.
      */
-    spacing?: {
+    spacing?: Partial<{
         stretch: number;
         shrink: number;
-        pull?: number;
-        boundaryShrink?: number;
-    };
+        pull: number;
+        boundaryShrink: number;
+    }>;
     /**
      * Letterfit tracking: lets inter-character space open or close each
      * line's set width, participating in break decisions like expansion.
@@ -158,6 +193,12 @@ interface JustifyOptions {
      */
     onSkip?: (paragraph: HTMLElement, reason: string) => void;
 }
+/**
+ * The layout settings a live reconfiguration can replace. Everything else a
+ * controller was built with — the hyphenator, callbacks, breaker penalties,
+ * clipboard cleanup, resize observation — is fixed for its lifetime.
+ */
+type LayoutOptions = Pick<JustifyOptions, "hangingPunctuation" | "protrusion" | "expansion" | "tracking" | "spacing" | "lastLineMinWidth" | "lastLineFit">;
 interface JustifyController {
     /**
      * Resolves once the content's font faces have settled (loaded or
@@ -169,13 +210,57 @@ interface JustifyController {
     readonly ready: Promise<void>;
     /**
      * Re-measure with the currently loaded font files and re-layout (also runs
-     * automatically when webfonts finish loading). For content or CSS changes,
-     * destroy() and justify() again — the original scan is reused here.
+     * automatically when webfonts finish loading). The original scan is reused, so
+     * CSS changes need `rescan()` and content changes a fresh controller.
      */
     refresh(): void;
+    /**
+     * Re-read author CSS and re-enhance wherever it now reads differently: what to
+     * call after changing the styling of managed paragraphs — `hyphens`, the font,
+     * `letter-spacing`, `white-space`, `line-height`, `text-indent` — from a
+     * stylesheet, a class, a theme toggle, or the devtools inspector.
+     *
+     * Returns the paragraphs it re-read. Ones whose styling is unchanged are left
+     * strictly alone, so calling this on every suspicion is cheap: the check is one
+     * computed-style read each. Paragraphs previously DECLINED are retried on the
+     * same terms, since a style change is exactly what can make one eligible.
+     *
+     * `targets` narrows the work to some of this controller's paragraphs; omitted,
+     * it considers all of them. Paragraphs released by `unjustify()` stay released.
+     *
+     * A re-read paragraph is restored to its author DOM and enhanced again, so —
+     * unlike `refresh()` — a selection or caret inside one does not survive. Text
+     * `content` changes are still out of scope: what gets re-read is the CSS.
+     */
+    rescan(targets?: Iterable<Element>): readonly HTMLElement[];
+    /**
+     * Replace this controller's layout settings and re-lay out its paragraphs,
+     * reusing the existing scan. Cheaper than `destroy()` + `justify()`, and it
+     * keeps observers, clipboard registration, and paragraph identity.
+     *
+     * `config` is COMPLETE, not a patch: a field left out takes the library
+     * default, which is how a caller restores one. Anything outside
+     * `LayoutOptions` is untouched — notably `hyphenate` (with its memoized
+     * cache), `onSkip`, and `onRelayout`. `cleanClipboard` and `observeResize`
+     * are deliberately not reconfigurable: the first registers a shared copy
+     * handler once, and the second attaches observers once, so changing either
+     * needs a fresh controller.
+     */
+    applyLayoutOptions(config: LayoutOptions): void;
     /** Restore the original DOM and disconnect observers. */
     destroy(): void;
     readonly paragraphs: readonly HTMLElement[];
+    /**
+     * The subset of `paragraphs` this controller still manages. Absent are ones
+     * it declined, ones released by `destroy()` or `unjustify()`, and ones whose
+     * enhancement was removed from the DOM from outside.
+     *
+     * Paragraphs sitting in native one-line layout ARE managed: they carry no
+     * `data-justif` attribute, but the controller still holds their measurements
+     * and watches for a measure narrow enough to make line breaking useful. Test
+     * this rather than the attribute to ask "is this enhancement still live?".
+     */
+    readonly managed: readonly HTMLElement[];
 }
 declare function justify(targets: Element | Iterable<Element>, options?: JustifyOptions): JustifyController;
 /** Restore paragraphs enhanced by any controller to their original DOM. */
@@ -200,7 +285,15 @@ declare function unjustify(targets: Element | Iterable<Element>): void;
  * justify with spacing only: wrong-language hyphenation is worse than
  * none. For full control use the API: `import { justify } from "justif"`.
  *
- * Optional overrides on the script tag:
+ * Typography is configured with `--justif-*` custom properties on the
+ * paragraphs, because that is where element-scoped settings belong: the cascade
+ * decides precedence, so there is none to invent here. Paragraphs group by
+ * language AND resolved configuration, so configuring nothing still costs
+ * exactly one controller per language. auto-options.ts owns that surface;
+ * changes to it apply on their own where the engine allows, which
+ * `liveUpdatesSupported` gates and `armWatcher` sets up.
+ *
+ * The script tag carries only what is not element-scoped:
  *   data-justif-selector="article p"   candidate elements (default below)
  *
  * Controllers are exposed at `window.justif.controllers` (with `justify`
@@ -224,6 +317,18 @@ declare global {
              * converged. The text is justified earlier — as soon as every
              * group has committed against the fonts rendering at that moment. */
             booted: Promise<void>;
+            /**
+             * Re-read the `--justif-*` configuration and bring controllers into line
+             * with it. Configuration changes normally apply on their own; this is the
+             * explicit path for the cases the watcher cannot see — an engine without
+             * `@property`, or a paragraph carrying the author's own `transition`
+             * declaration, which is never replaced.
+             *
+             * Resolves once the affected controllers have settled. `booted` keeps its
+             * original meaning and does not re-arm: on a page whose configuration
+             * changes periodically it would never settle.
+             */
+            reconfigure: () => Promise<void>;
         };
     }
 }

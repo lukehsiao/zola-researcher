@@ -138,7 +138,7 @@ interface Box {
     /** Protrusion credit (px) if this box starts a line after the first. */
     lp: number;
     /** Protrusion credit (px) if this box starts the paragraph's FIRST line
-     * (differs from lp only under hangingPunctuation "first-line"). */
+     * (differs from lp only under hanging "first-line-and-line-ends"). */
     lpFirst: number;
     /** Protrusion credit (px) if this box ends a line. */
     rp: number;
@@ -232,8 +232,7 @@ interface BuildOptions {
     exHyphenPenalty: number;
     protrusion: ProtrusionTable | false;
     /** Table for boxes starting the paragraph's FIRST line (full hanging
-     * punctuation on opening quotes/brackets). undefined → same as
-     * `protrusion`. */
+     * punctuation on opening quotes). undefined → same as `protrusion`. */
     protrusionFirst?: ProtrusionTable;
     expansion: ExpansionOptions | false;
     /** Letterfit tracking: inter-character space may open/close each line's
@@ -493,18 +492,28 @@ declare function protrusionCodes(table: ProtrusionTable, ch: string): Protrusion
 declare const latinProtrusion: ProtrusionTable;
 /**
  * Full-hang character set in the style of classical book typography and
- * CSS `hanging-punctuation`: quotes and opening brackets hang entirely
- * outside the measure at line starts, stops and quotes hang entirely at
- * line ends. Used by the `hangingPunctuation` option, which scopes the
- * LEFT codes to the paragraph's first line by default ("first-line" —
- * mid-paragraph line starts keep their partial microtype protrusion) and
- * applies the RIGHT codes on every line; "all-lines" extends the left
- * hangs to every line (Gutenberg style). May also be passed directly as
- * the `protrusion` option, which applies everything on every line,
- * position-independently.
+ * CSS `hanging-punctuation`: quotes hang entirely outside the measure at
+ * line starts, stops and quotes hang entirely at line ends (brackets do
+ * not — see below). `hangingPunctuation` can apply its RIGHT codes only
+ * (`"line-end-only"`), those plus the paragraph opener's LEFT code — the CSS
+ * `first` model (`"first-line-and-line-ends"`) — or both sides on every line
+ * (`"all-line-edges"`). This table may also be passed directly as `protrusion`,
+ * where it acts as a user override table rather than selecting a hanging
+ * policy.
+ *
+ * A mark's hang depth belongs to the character, never to where its line
+ * falls in the paragraph (see #14): two depths for one mark inside a
+ * paragraph read as a misaligned edge rather than as either style.
  */
 declare const hangingPunctuation: ProtrusionTable;
-type HangingPunctuationMode = false | "first-line" | "all-lines";
+/**
+ * Full-hanging policy layered over the selected protrusion model. Each name
+ * says which line edges hang fully, in increasing order.
+ *
+ * `"first-line"` and `"all-lines"` are the original spellings of
+ * `"first-line-and-line-ends"` and `"all-line-edges"`, and remain supported.
+ */
+type HangingPunctuationMode = false | "none" | "line-end-only" | "first-line-and-line-ends" | "all-line-edges" | "first-line" | "all-lines";
 /**
  * Composes the effective protrusion tables from a base table (generic or
  * generic+per-font), the hanging-punctuation mode, and the user's explicit
