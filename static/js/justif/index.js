@@ -2534,6 +2534,58 @@ function plainTextOf(node) {
   }
   return out;
 }
+function nonEmptyTextNodesInRange(range) {
+  const root = range.commonAncestorContainer;
+  const out = [];
+  const visit = node => {
+    if (node.nodeType !== Node.TEXT_NODE) return;
+    const text = node;
+    if (!range.intersectsNode(text)) return;
+    const start = text === range.startContainer ? range.startOffset : 0;
+    const end = text === range.endContainer ? range.endOffset : text.data.length;
+    if (start < end) out.push(text);
+  };
+  if (root.nodeType === Node.TEXT_NODE) visit(root);else {
+    const walker = root.ownerDocument.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+      visit(node);
+    }
+  }
+  return out;
+}
+function isJustifBoundaryJoint(node) {
+  const parent = node.parentElement;
+  return node.data === " " && parent !== null && parent.closest(".justif-seg") === null && parent.closest("[data-justif]") !== null;
+}
+function isClonedBoundaryJoint(node) {
+  const parent = node.parentElement;
+  return node.data === " " && (parent === null || parent.closest(".justif-seg") === null);
+}
+function removeCopiedBoundaryJoints(range, fragment) {
+  const included = nonEmptyTextNodesInRange(range);
+  if (included.length === 0) return;
+  const trimLeading = isJustifBoundaryJoint(included[0]);
+  const trimTrailing = isJustifBoundaryJoint(included[included.length - 1]);
+  if (!trimLeading && !trimTrailing) return;
+  const cloned = nonEmptyTextNodesInRange(
+  // A detached fragment is not a live selection range, so collect its text
+  // nodes directly rather than reusing the range helper above.
+  (() => {
+    const cloneRange = fragment.ownerDocument.createRange();
+    cloneRange.selectNodeContents(fragment);
+    return cloneRange;
+  })());
+  const remove = /* @__PURE__ */new Set();
+  const first = cloned[0];
+  const last = cloned[cloned.length - 1];
+  if (trimLeading && first !== void 0 && isClonedBoundaryJoint(first)) {
+    remove.add(first);
+  }
+  if (trimTrailing && last !== void 0 && isClonedBoundaryJoint(last)) {
+    remove.add(last);
+  }
+  for (const node of remove) node.remove();
+}
 var KERN_SAMPLE_MAX = 256;
 function collectFontProbes(scans, hyphenating) {
   const fontSample = /* @__PURE__ */new Map();
@@ -2605,7 +2657,9 @@ var onDocumentCopy = e => {
   const html = document.createElement("div");
   let plain = "";
   for (let i = 0; i < sel.rangeCount; i++) {
-    const frag = sel.getRangeAt(i).cloneContents();
+    const range = sel.getRangeAt(i);
+    const frag = range.cloneContents();
+    removeCopiedBoundaryJoints(range, frag);
     const walker = document.createTreeWalker(frag, NodeFilter.SHOW_TEXT);
     for (let n = walker.nextNode(); n !== null; n = walker.nextNode()) {
       n.nodeValue = clean(n.nodeValue ?? "");
