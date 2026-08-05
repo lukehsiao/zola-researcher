@@ -3,7 +3,7 @@
 <feed xmlns="http://www.w3.org/2005/Atom" xml:lang="{{ lang }}">
     <title>{{ config.extra.author }}'s blog
         {%- if term %} - {{ term.name }}
-        {%- elif section.title %} - {{ section.title }}
+        {%- elif section and section.title %} - {{ section.title }}
         {%- endif -%}
     </title>
     {%- if config.description %}
@@ -18,7 +18,7 @@
       {%- endif -%}
     "/>
     <generator uri="https://www.getzola.org/">Zola</generator>
-    <updated>{{ last_updated | date(format="%+") }}</updated>
+    {% if last_updated is defined %}<updated>{{ last_updated | date(format="%Y-%m-%dT%H:%M:%S%:z") }}</updated>{% endif %}
     <id>{{ feed_url | safe }}</id>
     {%- for page in pages %}
     {%- if not page.extra.hidden %}
@@ -35,8 +35,8 @@
             {%- endif -%}
           </name>
         </author>
-        <published>{{ page.date | date(format="%+") }}</published>
-        <updated>{{ page.updated | default(value=page.date) | date(format="%+") }}</updated>
+        <published>{{ page.date | date(format="%Y-%m-%dT%H:%M:%S%:z") }}</published>
+        {% if page.updated %}<updated>{{ page.updated | date(format="%Y-%m-%dT%H:%M:%S%:z") }}</updated>{% else %}<updated>{{ page.date | date(format="%Y-%m-%dT%H:%M:%S%:z") }}</updated>{% endif %}
         <link href="{{ page.permalink | safe }}"/>
         <link rel="alternate" href="{{ page.permalink | safe }}" type="text/html"/>
         <id>{{ page.permalink | safe }}</id>

@@ -12,13 +12,13 @@ in culpa qui officia deserunt mollit anim id est laborum.
 
 <!-- more -->
 
-{% figure(link="https://github.com/lukehsiao/zola-researcher", src="/blog/placeholder.svg", alt="A placeholder image", bg="transparent") %}
-A caption set with the `figure` shortcode.
-{% end %}
+{% <figure link="https://github.com/lukehsiao/zola-researcher" src="/blog/placeholder.svg" alt="A placeholder image" bg="transparent"> %}
+A caption set with the `figure` component.
+{% </figure> %}
 
-{% katex(block=true) %}
+{% <katex block={true}> %}
 \KaTeX
-{% end %}
+{% </katex> %}
 
 Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor
 incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis

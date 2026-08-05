@@ -1,8 +1,0 @@
-<figure{% if class %} class="{{ class }}"{% endif %}>
-  {% if link %}<a href="{{ link }}">{% endif -%}
-  <img src="{{ src }}" alt="{{ alt | default(value="") }}" style="background-color: {{ bg | default(value="white") }};{% if border %} border: {{ border }}px solid black;{% endif %}" />
-  {%- if link %}</a>{% endif %}
-  <figcaption>
-    {{ body | markdown(inline=true) | safe }}
-  </figcaption>
-</figure>

@@ -67,24 +67,24 @@ fn main() {
 
 ## Asides
 
-{% aside(type="note") %}
+{% <aside type="note"> %}
 A note aside, for calling out extra context.
-{% end %}
+{% </aside> %}
 
-{% aside(type="tip", title="Pro tip") %}
+{% <aside type="tip" title="Pro tip"> %}
 A tip aside with a custom title.
-{% end %}
+{% </aside> %}
 
-{% aside(type="caution") %}
+{% <aside type="caution"> %}
 A caution aside, for things that might surprise you.
-{% end %}
+{% </aside> %}
 
-{% aside(type="danger") %}
+{% <aside type="danger"> %}
 A danger aside, for things that will ruin your day.
-{% end %}
+{% </aside> %}
 
 ## An iframe
 
-{% youtube(id="dQw4w9WgXcQ") %}
+{% <youtube id="dQw4w9WgXcQ"> %}
 With some caption.
-{% end %}
+{% </youtube> %}

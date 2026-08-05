@@ -1,31 +1,10 @@
-{% if type is defined %}
-{% set t = type | lower %}
-{% else %}
-{% set t = "note" %}
-{% endif %}
-
-{% if t == "note" %}
-{% set aside_class = "aside--note" %}
-{% elif t == "tip" %}
-{% set aside_class = "aside--tip" %}
-{% elif t == "caution" %}
-{% set aside_class = "aside--caution" %}
-{% elif t == "danger" %}
-{% set aside_class = "aside--danger" %}
-{% else %}
-{% set aside_class = "aside--note" %}
-{% endif %}
-
-{% if title is defined and title | length > 0 %}
-{% set aside_title = title %}
-{% else %}
-{% set aside_title = t | title %}
-{% endif %}
-
-<div class="aside {{ aside_class }}">
+{% component aside(type: string = "note", title: string = "") -%}
+{%- set kind = type | lower -%}
+{%- set kind = kind if kind in ["note", "tip", "caution", "danger"] else "note" -%}
+<div class="aside aside--{{ kind }}">
   <div class="aside__header" role="heading" aria-level="3">
     <div class="aside__icon" aria-hidden="true">
-      {% if t == "note" %}
+      {%- if kind == "note" %}
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
         class="icon icon-tabler icons-tabler-outline icon-tabler-info-circle">
@@ -34,7 +13,7 @@
         <path d="M12 9h.01" />
         <path d="M11 12h1v4h1" />
       </svg>
-      {% elif t == "tip" %}
+      {%- elif kind == "tip" %}
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
         class="icon icon-tabler icons-tabler-outline icon-tabler-rocket">
@@ -43,7 +22,7 @@
         <path d="M7 14a6 6 0 0 0 -3 6a6 6 0 0 0 6 -3" />
         <path d="M15 9m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
       </svg>
-      {% elif t == "caution" %}
+      {%- elif kind == "caution" %}
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
         stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
         class="icon icon-tabler icons-tabler-outline icon-tabler-alert-triangle">
@@ -53,7 +32,7 @@
           d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0z" />
         <path d="M12 16h.01" />
       </svg>
-      {% else %}
+      {%- else %}
       <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"
         class="icon icon-tabler icons-tabler-filled icon-tabler-radioactive">
         <path stroke="none" d="M0 0h24v24H0z" fill="none" />
@@ -64,11 +43,46 @@
         <path
           d="M9 11a1 1 0 0 1 .993 .884l.007 .117a2 2 0 0 0 .861 1.645l.237 .152a.994 .994 0 0 1 .165 .155l.067 .089l.056 .095l.045 .099c.014 .036 .026 .07 .035 .106l.022 .107l.011 .11a.994 .994 0 0 1 -.08 .437l-.053 .104l-3 5.19a1 1 0 0 1 -1.366 .366a10 10 0 0 1 -5 -8.656a1 1 0 0 1 .883 -.993l.117 -.007h6z" />
       </svg>
-      {% endif %}
+      {%- endif %}
     </div>
-
-    <span class="aside__title">{{ aside_title }}</span>
+    <span class="aside__title">{{ title if title else (kind | title) }}</span>
   </div>
-
   <div class="aside__body">{{ body | markdown | safe }}</div>
 </div>
+{%- endcomponent %}
+
+{% component figure(src: string, alt: string = "", link: string = "", bg: string = "white", border = 0, class: string = "") -%}
+<figure{% if class %} class="{{ class }}"{% endif %}>
+  {%- if link %}<a href="{{ link }}">{% endif %}
+  <img src="{{ src }}" alt="{{ alt }}" style="background-color: {{ bg }};{% if border %} border: {{ border }}px solid black;{% endif %}" />
+  {%- if link %}</a>{% endif %}
+  <figcaption>{{ body | markdown(inline=true) | safe }}</figcaption>
+</figure>
+{%- endcomponent %}
+
+{% component youtube(id: string, title: string = "", class: string = "", autoplay = false) -%}
+<figure{% if class %} class="{{ class }}"{% endif %}>
+  <div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden;">
+    <iframe src="https://www.youtube.com/embed/{{ id }}{% if autoplay %}?autoplay=1{% endif %}" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: 0;" title="youtube video" webkitallowfullscreen mozallowfullscreen allowfullscreen></iframe>
+  </div>
+  <figcaption>
+    {%- if title %}<h4>{{ title }}</h4>{% endif %}
+    {{ body | markdown | safe }}
+  </figcaption>
+</figure>
+{%- endcomponent %}
+
+{% component katex(block = false) -%}
+<script type="math/tex{% if block %};mode=display{% endif %}">{{ body | trim | safe }}</script>
+{%- endcomponent %}
+
+{# The blank lines around the body are load-bearing: they close the opening HTML
+   block so the Markdown renderer parses the table inside the div as a table
+   rather than as literal text. `safe` keeps the Markdown source unescaped. #}
+{% component table(overflow = false) -%}
+<div align="center"{% if overflow %} style="overflow-x:auto;"{% endif %}>
+
+{{ body | safe }}
+
+</div>
+{%- endcomponent %}

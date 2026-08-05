@@ -19,7 +19,7 @@
     </h3>
     <div class="post__meta">
       <span>
-        <time datetime="{{ page.date | date(format="%+") | safe }}">
+        <time datetime="{{ page.date | date(format="%Y-%m-%dT%H:%M:%S%:z") | safe }}">
           {{ page.date | date(format="%F") }}
         </time>
       </span>

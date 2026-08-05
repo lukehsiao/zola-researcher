@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Support [`justif`](https://github.com/lyallcooper/justif) justification.
 
+### Changed
+- **Breaking:** the theme now requires Zola 0.23. That release removed shortcodes and moved to Tera 2, and neither change is backwards compatible.
+- Shortcodes are now Tera components, defined together in `templates/components.html`. Call sites change from `{% figure(src="x") %}...{% end %}` to `{% <figure src="x"> %}...{% </figure> %}`, and non-string arguments are braced, as in `block={true}`.
+- Post and feed timestamps are formatted with an explicit `%Y-%m-%dT%H:%M:%S%:z`. Tera 2 rejects the `%+` shorthand.
+- The example site configuration is now `zola.toml`, the name Zola 0.23 prefers.
+
+### Removed
+- The `get_url` shortcode. Zola 0.23 templates page content, so `{{ get_url(path="...") }}` works in Markdown without it.
+- The `keywords` block override in `404.html`, which no parent template defined. Tera 2 rejects overriding an undefined block.
+
 ## [0.2.0]
 
 A big polish pass on the theme.

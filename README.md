@@ -12,12 +12,14 @@ It uses a dark, [Flexoki](https://stephango.com/flexoki)-inspired palette and sh
 - Portfolio landing page plus a paginated blog with an Atom feed
 - Bundled [Atkinson Hyperlegible Next](https://www.brailleinstitute.org/freefont/) variable font (SIL OFL 1.1)
 - KaTeX math rendering, rendered client-side with locally hosted assets
-- Shortcodes for figures, YouTube embeds, asides/admonitions, and wide tables
+- Components for figures, YouTube embeds, asides/admonitions, and wide tables
 - Human-friendly XSLT-styled Atom feed
 - [instant.page](https://instant.page/) prefetching (optional)
 - Customizable fonts and extra CSS without forking the theme
 
 ## Installation
+
+Requires Zola 0.23 or newer.
 
 Download this theme to your `themes` directory:
 
@@ -26,7 +28,7 @@ cd themes
 git clone https://github.com/lukehsiao/zola-researcher.git
 ```
 
-and then enable it in your `config.toml`:
+and then enable it in your `zola.toml`:
 
 ```toml
 theme = "zola-researcher"
@@ -71,7 +73,7 @@ hidden = true    # exclude from listings and the feed
 
 ## Options
 
-All theme options live under `[extra]` in `config.toml`:
+All theme options live under `[extra]` in `zola.toml`:
 
 ```toml
 [extra]
@@ -107,7 +109,7 @@ fontawesome = false
 custom_css = []
 ```
 
-A full example configuration is included in this repository's `config.toml`.
+A full example configuration is included in this repository's `zola.toml`.
 
 ### Fonts
 
@@ -140,13 +142,13 @@ Replace them by putting your own files at the same paths in your site's `static`
 Math support uses [KaTeX](https://katex.org/), enabled by setting `katex_enable = true` in `[extra]`.
 All KaTeX assets are served locally.
 
-With the extension enabled, use the `katex` shortcode:
+With the extension enabled, use the `katex` component:
 
 ```jinja
-{% katex(block=true) %}\KaTeX{% end %}
+{% <katex block={true}> %}\KaTeX{% </katex> %}
 ```
 
-`block=true` typesets a display block like `$$...$$` in LaTeX; omit it for inline math.
+`block={true}` typesets a display block like `$$...$$` in LaTeX; omit it for inline math.
 
 ### Justified text
 
@@ -159,36 +161,52 @@ Elements whose inline code holds an unbreakable token wider than a third of the 
 justif applies the TeX line-breaking algorithm with English hyphenation to paragraphs it can measure, and native `text-align: justify` remains the fallback for skipped paragraphs and visitors without JavaScript.
 The init hyphenates in American English; edit `justif-init.js` to add other languages.
 
-### Figure shortcode
+### Figure component
 
 Captioned figures, with optional link, background color, and border:
 
 ```jinja
-{% figure(src="/img/plot.svg", alt="A plot", link="https://example.com", bg="transparent") %}
+{% <figure src="/img/plot.svg" alt="A plot" link="https://example.com" bg="transparent"> %}
 Your caption here. Markdown works.
-{% end %}
+{% </figure> %}
 ```
 
-### Aside shortcode
+### Aside component
 
 Admonition blocks in four flavors: `note`, `tip`, `caution`, and `danger`.
 The title is optional and defaults to the capitalized type.
 
 ```jinja
-{% aside(type="tip", title="Pro tip") %}
+{% <aside type="tip" title="Pro tip"> %}
 Some helpful advice. Markdown works.
-{% end %}
+{% </aside> %}
 ```
 
-### YouTube shortcode
+### YouTube component
 
 A responsive, captioned YouTube embed:
 
 ```jinja
-{% youtube(id="dQw4w9WgXcQ") %}
+{% <youtube id="dQw4w9WgXcQ"> %}
 With some caption.
-{% end %}
+{% </youtube> %}
 ```
+
+### Table component
+
+A centered table, optionally scrollable when it is too wide for the page:
+
+```jinja
+{% <table overflow={true}> %}
+
+| Metric | Value |
+| :----- | ----: |
+| Rows   |     3 |
+
+{% </table> %}
+```
+
+The blank lines around the table are required so that it is still parsed as Markdown.
 
 ### Icons
 
@@ -207,6 +225,8 @@ For example, to replace the footer, create `templates/index.html` in your site:
 <p>My custom footer.</p>
 {% endblock footer %}
 ```
+
+Components are defined in `templates/components.html` and registered globally, so a site can call them from both content and templates, or define its own the same way.
 
 ## License
 
