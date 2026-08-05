@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0]
+
+This is a breaking change to adopt Zola 0.23.0.
+
 ### Added
 - Support [`justif`](https://github.com/lyallcooper/justif) justification.
 
