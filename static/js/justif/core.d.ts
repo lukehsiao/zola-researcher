@@ -82,7 +82,7 @@ declare function breakRp(items: readonly Item[], b: number): number;
  * Flattens a paragraph's styled runs into the Knuth-Plass item stream.
  * Whitespace is collapsed; words become boxes measured whole (kerning-safe),
  * spaces become glue from the run's space spec, and break opportunities
- * (soft hyphens, hyphenator output, explicit hyphens) become penalties.
+ * (soft hyphens, hyphenator output, dashes) become penalties.
  * Ends with the TeX parfillskip idiom so the last line sets naturally.
  */
 declare function buildItems(texts: readonly RunText[], runs: readonly RunMetrics[], opts: BuildOptions, measure: Measure): ParagraphItems;

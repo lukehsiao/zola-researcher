@@ -1,5 +1,5 @@
-import { normalizeHangingPunctuation, composeProtrusion, latinProtrusion, defaultBuildOptions, breakParagraph, layoutLines, graphemes, defaultBreakOptions, ItemType, CJK_CHAR, fontProtrusion, buildItems, textMakesBox } from './chunk-2WL5JIIM.js';
-export { composeProtrusion, fontProtrusion, hangingPunctuation, kinsokuNotAtLineEnd, kinsokuNotAtLineStart, latinProtrusion } from './chunk-2WL5JIIM.js';
+import { normalizeHangingPunctuation, composeProtrusion, latinProtrusion, defaultBuildOptions, breakParagraph, layoutLines, graphemes, defaultBreakOptions, ItemType, CJK_CHAR, fontProtrusion, buildItems, textMakesBox } from './chunk-YDWWCPIR.js';
+export { composeProtrusion, fontProtrusion, hangingPunctuation, kinsokuNotAtLineEnd, kinsokuNotAtLineStart, latinProtrusion } from './chunk-YDWWCPIR.js';
 
 // src/dom/measure.ts
 function fontSpecOf(style) {

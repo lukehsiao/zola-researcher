@@ -577,6 +577,16 @@ function lineWidthAt(widths, line) {
 var SOFT_HYPHEN = "\xAD";
 var WORD_CORE = /^(\P{L}*)(\p{L}+)(\P{L}*)$/u;
 var MIN_HYPHENATION_LENGTH = 5;
+function isBreakingDash(code) {
+  return code === 45 || code === 8208 || code === 8211 || code === 8212;
+}
+function isAnyDash(code) {
+  return code === 45 || code >= 8208 && code <= 8213;
+}
+var NO_LINE_START = /[,.;:!?%)\]}\u00BB\u203A\u2019\u201D\u2026\u2030\u203C\u2047\u2048\u2049]/;
+var NO_LINE_END = /[([{\u00AB\u2039\u2018\u201C\u00BF\u00A1]/;
+var DIGIT = /\p{Nd}/u;
+var NEAR_PROHIBITIVE_PENALTY = 9999;
 var BREAKABLE_SPLIT = /([^\S\u00A0\u202F]+)/;
 function mayBeCJK(text) {
   for (let i = 0; i < text.length; i++) {
@@ -633,18 +643,37 @@ function codePointLength(text) {
   }
   return count;
 }
-function splitAfterHyphens(token) {
-  if (token.indexOf("-") < 0) return [token];
+function splitAtDashes(token) {
+  let dashed = false;
+  for (let i = 0; i < token.length; i++) {
+    if (isBreakingDash(token.charCodeAt(i))) {
+      dashed = true;
+      break;
+    }
+  }
+  if (!dashed) return [token];
   const chunks = [];
   let start = 0;
   for (let i = 0; i < token.length - 1; i++) {
-    if (token[i] === "-" && token[i + 1] !== "-") {
+    if (isBreakingDash(token.charCodeAt(i)) && !isAnyDash(token.charCodeAt(i + 1))) {
       chunks.push(token.slice(start, i + 1));
       start = i + 1;
     }
   }
   chunks.push(token.slice(start));
   return chunks;
+}
+function beforeTrailingDashes(chunk) {
+  let i = chunk.length - 1;
+  while (i >= 0 && isAnyDash(chunk.charCodeAt(i))) i--;
+  return i >= 0 ? chunk[i] : "";
+}
+function dashJunctionClass(before, after) {
+  const stem = beforeTrailingDashes(before);
+  if (stem === "" || NO_LINE_END.test(stem)) return 0;
+  const next = after[0];
+  if (NO_LINE_START.test(next)) return 0;
+  return DIGIT.test(next) && DIGIT.test(stem) ? 3 : 2;
 }
 function clipExclusion(exclusion, start, length) {
   const end = start + length;
@@ -833,11 +862,16 @@ function buildItems(texts, runs, opts, measure) {
     pieceText[pieceCount++] = chunk;
     return false;
   };
-  const flushPendingSpace = nextRun => {
+  const flushPendingSpace = function (nextRun, dashInitial) {
+    if (dashInitial === void 0) {
+      dashInitial = false;
+    }
     if (pendingSpaceRun >= 0 && hasBox) {
       const space = runs[pendingSpaceRun].space;
       if (pendingLeadingSpace || pieceKey !== void 0 && pieceKey === lastBoxKey) {
         pushPenalty(INF_PENALTY, 0, false, false, 0, pendingSpaceRun);
+      } else if (dashInitial) {
+        pushPenalty(NEAR_PROHIBITIVE_PENALTY, 0, false, false, 0, pendingSpaceRun);
       }
       const boundary = lastBoxRun >= 0 && runs[lastBoxRun].familyKey !== runs[nextRun].familyKey;
       items.push({
@@ -861,7 +895,7 @@ function buildItems(texts, runs, opts, measure) {
       if (pieceCount > 0) pieceAfter[pieceCount - 1] = 0;
     } else {
       const noHyphens = run.noHyphens === true;
-      const chunks = splitAfterHyphens(token);
+      const chunks = splitAtDashes(token);
       for (let c = 0; c < chunks.length; c++) {
         const first = pieceCount;
         const fromHyphenator = chunkPieces(chunks[c], noHyphens);
@@ -870,12 +904,12 @@ function buildItems(texts, runs, opts, measure) {
           pieceFromHyphenator[q] = fromHyphenator;
         }
         if (pieceCount > first) {
-          pieceAfter[pieceCount - 1] = c < chunks.length - 1 ? 2 : 0;
+          pieceAfter[pieceCount - 1] = c < chunks.length - 1 ? dashJunctionClass(chunks[c], chunks[c + 1]) : 0;
         }
       }
     }
     if (pieceCount === 0) return;
-    flushPendingSpace(runIndex);
+    flushPendingSpace(runIndex, isAnyDash(token.charCodeAt(0)));
     if (pieceCount === 1 && pieceAfter[0] === 0 && exclusion === null) {
       const only = pieceText[0];
       emitBox(makeBox(only, runIndex, measure.width(only, run)), runIndex);
@@ -900,8 +934,8 @@ function buildItems(texts, runs, opts, measure) {
       const after = pieceAfter[q];
       if (after === 1) {
         pushPenalty(opts.hyphenPenalty, run.hyphenWidth, true, pieceFromHyphenator[q], hyphenRp(run), runIndex);
-      } else if (after === 2) {
-        pushPenalty(opts.exHyphenPenalty, 0, true, false, box.rp, runIndex);
+      } else if (after === 2 || after === 3) {
+        pushPenalty(after === 3 ? NEAR_PROHIBITIVE_PENALTY : opts.exHyphenPenalty, 0, true, false, box.rp, runIndex);
       }
     }
   };
@@ -937,7 +971,7 @@ function buildItems(texts, runs, opts, measure) {
         flowExclusion: clusterExclusion
       });
     }
-    flushPendingSpace(runIndex);
+    flushPendingSpace(runIndex, isAnyDash(clean.charCodeAt(0)));
     let prev = null;
     for (const group of groups) {
       const width = measure.width(group.flowText, run);
@@ -3131,5 +3165,5 @@ function fontProtrusion(familyList) {
   return id === void 0 ? void 0 : TABLES[id];
 }
 export { CJK_CHAR, Fitness, INF_BAD, INF_PENALTY, ItemType, UNDERFULL_RATIO, badness, breakParagraph, breakRp, buildItems, cjkBreakAllowed, composeProtrusion, defaultBreakOptions, defaultBuildOptions, demerits, demeritsUncapped, fitness, fontProtrusion, graphemes, hangingPunctuation, kinsokuNotAtLineEnd, kinsokuNotAtLineStart, latinProtrusion, layoutLines, lineText, lineWidthAt, maxEndingStretch, normalizeHangingPunctuation, protrusionCodes, textMakesBox, withSums };
-//# sourceMappingURL=chunk-2WL5JIIM.js.map
-//# sourceMappingURL=chunk-2WL5JIIM.js.map
+//# sourceMappingURL=chunk-YDWWCPIR.js.map
+//# sourceMappingURL=chunk-YDWWCPIR.js.map
