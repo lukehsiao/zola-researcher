@@ -51,6 +51,17 @@ interface RunMetrics {
      */
     protrudeInkOnly?: boolean;
     /**
+     * Case mapping this run RENDERS under (CSS `text-transform`); absent when
+     * it renders its source text. Box text stays source text throughout — only
+     * per-character glyph identity needs this, because protrusion codes
+     * describe glyphs and `A` and `a` carry different ones. Widths never do:
+     * the measurer already probes with the property applied.
+     *
+     * Only the two context-free mappings appear here. `capitalize` depends on
+     * where a word starts, which a per-character lookup cannot answer.
+     */
+    textTransform?: "uppercase" | "lowercase";
+    /**
      * Hand-tuned protrusion table matched to this run's font (microtype's
      * per-font configs). Overrides BuildOptions.protrusion for this run;
      * absent → the paragraph-wide table applies.
@@ -58,6 +69,8 @@ interface RunMetrics {
     protrusion?: ProtrusionTable;
     /** First-line variant of `protrusion` (see BuildOptions.protrusionFirst). */
     protrusionFirst?: ProtrusionTable;
+    /** Per-run variant of `BuildOptions.protrusionCredit`. */
+    protrusionCredit?: ProtrusionTable;
     /**
      * Identity of this run's font family (stack), independent of style,
      * weight, and size. Word spaces BETWEEN runs of different families lose
@@ -142,6 +155,13 @@ interface Box {
     lpFirst: number;
     /** Protrusion credit (px) if this box ends a line. */
     rp: number;
+    /** Stretch/shrink belonging to collapsible spaces included in a trailing
+     * whitespace run. Excluded only when this box actually ends the line.
+     * Always written (zero for the overwhelming majority of boxes) so the whole
+     * box stream keeps one hidden class: the breaker reads both at every
+     * breakpoint, and an absent field there costs more than the field does. */
+    hangStretch: number;
+    hangShrink: number;
     /** This is the actual final box of a painted inline. Renderers use the
      * marker (independent of rp, which may legitimately be zero) to keep
      * wrap-safety margins outside the decoration instead of pinching it. */
@@ -154,6 +174,12 @@ interface Box {
      * ratio as glue. Rendered as per-segment letter-spacing. */
     trackStretch: number;
     trackShrink: number;
+    /** A fixed-width CSS "other space separator" emitted as its own box. It
+     * remains real source text rather than becoming inter-word glue. If a
+     * following penalty is chosen, the renderer already owns the character at
+     * the end of this box and must emit a zero-width joint rather than inserting
+     * an ordinary space. */
+    otherSpace?: boolean;
     /** Inline padding/border px folded into `width` (RunText extras). The
      * glyph run's own advance is width − padPx: expansion gain must scale
      * only the glyphs, never the box decorations. */
@@ -183,6 +209,9 @@ interface Glue {
      * segment — with fully shrinkable interior spaces.
      */
     rigid?: boolean;
+    /** This collapsible space is immediately followed by a fixed-width space.
+     * If that separator run ends the line, CSS hangs this glue with it. */
+    fixedSpaceInitial?: boolean;
 }
 interface Penalty {
     type: typeof ItemType.Penalty;
@@ -205,6 +234,8 @@ interface Penalty {
      * rendering the space they consumed.
      */
     cjk?: boolean;
+    /** Soft-wrap boundary after a complete fixed-width separator run. */
+    fixedSpace?: boolean;
 }
 type Item = Box | Glue | Penalty;
 /** Protrusion codes in thousandths of the glyph's own advance (pdfTeX).
@@ -234,6 +265,11 @@ interface BuildOptions {
     /** Table for boxes starting the paragraph's FIRST line (full hanging
      * punctuation on opening quotes). undefined → same as `protrusion`. */
     protrusionFirst?: ProtrusionTable;
+    /** The protrusion model WITHOUT the hang overlay, used for the one glyph a
+     * fully hung mark leaves at the line's start: it takes an ordinary optical
+     * depth, never a second full hang. undefined → that glyph is credited
+     * nothing. */
+    protrusionCredit?: ProtrusionTable;
     expansion: ExpansionOptions | false;
     /** Letterfit tracking: inter-character space may open/close each line's
      * set width by these fractions (Bringhurst's tolerance is 0.03). Off by
@@ -348,6 +384,11 @@ interface ParagraphItems {
     cumTrackY: Float64Array;
     /** Index of the first box at or after item i (items.length if none). */
     firstBoxAfter: Int32Array;
+    /** Index of the last box STRICTLY BEFORE item i (−1 if none). A break at i
+     * inherits that box's protrusion and hang flex, so the breaker resolves it
+     * at every breakpoint; precomputing turns the walk back over penalties and
+     * glue into one array read. */
+    lastBoxBefore: Int32Array;
 }
 /** Target width per line index (constant, or varying e.g. for text-indent). */
 type LineWidths = number | readonly number[];
@@ -422,6 +463,21 @@ interface Line {
     width: number;
 }
 declare function lineWidthAt(widths: LineWidths, line: number): number;
+/**
+ * The text a context-free `text-transform` renders for `text` — the ONE case
+ * mapping shared by the item model's glyph-identity lookups and the
+ * measurer's length checks, so the two sides can never disagree about which
+ * glyph a source character became.
+ *
+ * Deliberately locale-naive where the rendering engine is not (a probe under
+ * lang="tr" uppercases `i` to `İ`; this maps it to `I`): it answers which
+ * protrusion-table entry to look under and whether a mapping changes length,
+ * never what the engine draws — widths always come from a probe carrying the
+ * real property — and a miss on a locale-special glyph merely forgoes its
+ * protrusion. Values other than the two supported mappings pass text through
+ * unchanged.
+ */
+declare function caseTransformedText(text: string, transform: string | undefined): string;
 
 /**
  * CJK (Japanese-first) line-breaking support: script detection, grapheme
@@ -491,19 +547,46 @@ declare function protrusionCodes(table: ProtrusionTable, ch: string): Protrusion
  */
 declare const latinProtrusion: ProtrusionTable;
 /**
- * Full-hang character set in the style of classical book typography and
- * CSS `hanging-punctuation`: quotes hang entirely outside the measure at
- * line starts, stops and quotes hang entirely at line ends (brackets do
- * not — see below). `hangingPunctuation` can apply its RIGHT codes only
- * (`"line-end-only"`), those plus the paragraph opener's LEFT code — the CSS
- * `first` model (`"first-line-and-line-ends"`) — or both sides on every line
- * (`"all-line-edges"`). This table may also be passed directly as `protrusion`,
- * where it acts as a user override table rather than selecting a hanging
- * policy.
+ * The characters hanging punctuation treats as MARGINAL — not part of the
+ * text's rectangle — in the style of classical book typography and CSS
+ * `hanging-punctuation`. Membership, and nothing else: hanging is a
+ * classification, so a character is either outside the measure or it is not.
+ * How far a mark sits from the margin when it is NOT hung is a question for
+ * the protrusion model, which is the other feature entirely.
  *
- * A mark's hang depth belongs to the character, never to where its line
- * falls in the paragraph (see #14): two depths for one mark inside a
- * paragraph read as a misaligned edge rather than as either style.
+ * Quotes are marginal in either role at either edge; stops only at line ends.
+ * `HangingPunctuationMode` then says WHERE the classification applies — line
+ * ends alone, plus the paragraph opener (the CSS `first` model), or every line
+ * edge — and a mark's membership never varies with where its line falls in the
+ * paragraph (see #14): one mark at two depths inside a paragraph reads as a
+ * misaligned edge rather than as either style.
+ *
+ * Brackets are deliberately absent, on either side. CSS `first` hangs the whole
+ * Ps category, but no print system hangs a bracket more than slightly: measured
+ * in Junicode, a line-start "(" hangs 100‰ of its advance in Affinity and 249‰
+ * in InDesign, against microtype's generic 100‰. Leaving them out gives them
+ * exactly that ordinary protrusion, the same depth on every line.
+ *
+ * The CJK stops are burasage (ぶら下げ組み): the classical Japanese
+ * newspaper/book setting hangs them fully into the right margin. Their glyphs
+ * sit in the left half of a fullwidth advance, so the ink lands just past the
+ * margin while the em-box hangs; kinsoku already guarantees they can end a line
+ * but never start one.
+ */
+interface HangingCharacters {
+    /** Marginal at a line START. */
+    readonly start: string;
+    /** Marginal at a line END. */
+    readonly end: string;
+}
+declare const hangingCharacters: HangingCharacters;
+/**
+ * `hangingCharacters` expressed as protrusion codes. Derived, not authored —
+ * the set above is the source of truth. Exported for callers who want the
+ * MAGNITUDE reading of the same characters: passed as `protrusion` it makes
+ * these marks protrude their full advance without classifying them, so the
+ * glyph beside a mark is credited nothing, which is what every other
+ * implementation does.
  */
 declare const hangingPunctuation: ProtrusionTable;
 /**
@@ -521,10 +604,32 @@ type HangingPunctuationMode = false | "none" | "line-end-only" | "first-line-and
  * the first (`rest`) and for the paragraph's first line (`first`); the two
  * are the SAME object when no first-line distinction exists, so callers
  * can cheaply skip duplicate work.
+ *
+ * `credit` is the same composition WITHOUT the hang overlay — the protrusion
+ * model as it would stand with hanging off. It exists for the one glyph a
+ * hung mark leaves at the line's start: that glyph takes the ordinary optical
+ * treatment, never a second full hang, so `“‘Twas` hangs one quote and gives
+ * the second whatever a `‘` is worth at a line start. Only one mark ever
+ * hangs, which is also what every other implementation does.
+ *
+ * It is undefined unless the MODE hangs somewhere, because crediting is
+ * something the hanging POLICY does, not something a number does. "This mark
+ * is not part of the line" and "this mark sticks out 1000‰" are different
+ * claims: only the first says anything about what sits beside it. So a
+ * `protrusion` table containing 1000 protrudes that mark and credits nothing —
+ * the behaviour every other implementation has.
+ *
+ * CREDITING is what does not vary with the number: no table value earns it, so
+ * there is no cliff between 999 and 1000 to fall off. The GEOMETRY does vary
+ * there, deliberately — 999 is a partial hang and takes the ink-exit cap, 1000
+ * means the mark has left the measure and clears its whole contextual advance.
+ * That is the same discontinuity the two features are: a magnitude below, a
+ * classification at. Codes cap at 1000, since there is nothing beyond gone.
  */
-declare function composeProtrusion(base: ProtrusionTable, user: ProtrusionTable | null, hang: HangingPunctuationMode): {
+declare function composeProtrusion(base: ProtrusionTable, user: ProtrusionTable | null, hang: HangingPunctuationMode, chars?: HangingCharacters): {
     rest: ProtrusionTable;
     first: ProtrusionTable;
+    credit?: ProtrusionTable;
 };
 
 /**
@@ -535,4 +640,4 @@ declare function composeProtrusion(base: ProtrusionTable, user: ProtrusionTable 
  */
 declare function fontProtrusion(familyList: string): ProtrusionTable | undefined;
 
-export { type BuildOptions as B, CJK_CHAR as C, type ExpansionOptions as E, type Glue as G, type HangingPunctuationMode as H, type Item as I, type LineWidths as L, type Measure as M, type ParagraphItems as P, type RunText as R, type TrackingOptions as T, type RunMetrics as a, type BreakOptions as b, type BreakResult as c, type Line as d, type Box as e, type GlueSpec as f, ItemType as g, type Penalty as h, type ProtrusionCodes as i, type ProtrusionTable as j, cjkBreakAllowed as k, composeProtrusion as l, defaultBreakOptions as m, defaultBuildOptions as n, fontProtrusion as o, graphemes as p, hangingPunctuation as q, kinsokuNotAtLineEnd as r, kinsokuNotAtLineStart as s, latinProtrusion as t, lineWidthAt as u, protrusionCodes as v };
+export { type BuildOptions as B, CJK_CHAR as C, type ExpansionOptions as E, type Glue as G, type HangingPunctuationMode as H, type Item as I, type LineWidths as L, type Measure as M, type ParagraphItems as P, type RunText as R, type TrackingOptions as T, type RunMetrics as a, type BreakOptions as b, type BreakResult as c, type Line as d, type Box as e, type GlueSpec as f, ItemType as g, type Penalty as h, type ProtrusionCodes as i, type ProtrusionTable as j, caseTransformedText as k, cjkBreakAllowed as l, composeProtrusion as m, defaultBreakOptions as n, defaultBuildOptions as o, fontProtrusion as p, graphemes as q, hangingCharacters as r, hangingPunctuation as s, kinsokuNotAtLineEnd as t, kinsokuNotAtLineStart as u, latinProtrusion as v, lineWidthAt as w, protrusionCodes as x };

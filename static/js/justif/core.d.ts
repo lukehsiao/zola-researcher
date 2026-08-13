@@ -1,5 +1,5 @@
-import { I as Item, R as RunText, a as RunMetrics, B as BuildOptions, M as Measure, P as ParagraphItems, L as LineWidths, b as BreakOptions, c as BreakResult, d as Line } from './protrusion-fonts-CSWfHIqB.js';
-export { e as Box, C as CJK_CHAR, E as ExpansionOptions, G as Glue, f as GlueSpec, H as HangingPunctuationMode, g as ItemType, h as Penalty, i as ProtrusionCodes, j as ProtrusionTable, T as TrackingOptions, k as cjkBreakAllowed, l as composeProtrusion, m as defaultBreakOptions, n as defaultBuildOptions, o as fontProtrusion, p as graphemes, q as hangingPunctuation, r as kinsokuNotAtLineEnd, s as kinsokuNotAtLineStart, t as latinProtrusion, u as lineWidthAt, v as protrusionCodes } from './protrusion-fonts-CSWfHIqB.js';
+import { I as Item, R as RunText, a as RunMetrics, B as BuildOptions, M as Measure, P as ParagraphItems, L as LineWidths, b as BreakOptions, c as BreakResult, d as Line } from './protrusion-fonts-B5ZKQ5nC.js';
+export { e as Box, C as CJK_CHAR, E as ExpansionOptions, G as Glue, f as GlueSpec, H as HangingPunctuationMode, g as ItemType, h as Penalty, i as ProtrusionCodes, j as ProtrusionTable, T as TrackingOptions, k as caseTransformedText, l as cjkBreakAllowed, m as composeProtrusion, n as defaultBreakOptions, o as defaultBuildOptions, p as fontProtrusion, q as graphemes, r as hangingCharacters, s as hangingPunctuation, t as kinsokuNotAtLineEnd, u as kinsokuNotAtLineStart, v as latinProtrusion, w as lineWidthAt, x as protrusionCodes } from './protrusion-fonts-B5ZKQ5nC.js';
 
 /**
  * TeX-exact badness and demerits arithmetic (TeX: The Program §108, §834,
@@ -74,8 +74,11 @@ declare function demeritsUncapped(linePenalty: number, b: number, p: number): nu
  * hyphen's for width-carrying penalties, otherwise the line's LAST BOX —
  * found by walking back over unbroken penalties and glue, so the paragraph-
  * final box protrudes past the parfillskip tail too (a full last line's
- * period must hang like any other line's). Shared by the breaker and
- * layoutLines so the two can never drift.
+ * period must hang like any other line's).
+ *
+ * This is the walking form, for callers holding a bare item array. The
+ * breaker and layoutLines hold a ParagraphItems and take `breakEndBox` +
+ * `rpAt` instead, which is the same rule without the walk.
  */
 declare function breakRp(items: readonly Item[], b: number): number;
 /**

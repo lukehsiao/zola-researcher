@@ -82,7 +82,10 @@ interface JustifyOptions {
      * An object selects the fixed table-backed model and supplies
      * per-character overrides, in thousandths of the character's own advance.
      * Overrides are merged over the generic Latin table and any matching
-     * hand-tuned per-font table.
+     * hand-tuned per-font table. Values cap at 1000 — a whole advance is as far
+     * out as a glyph goes — while negatives are honoured and pull it inward. A
+     * value here sets how far a character protrudes and never makes it hang;
+     * membership is `hangingPunctuation`'s to decide.
      *
      * Built-in tables (the generic Latin list plus microtype's per-font configs)
      * remain as the FALLBACK, used per font wherever the measurement cannot run
@@ -105,11 +108,14 @@ interface JustifyOptions {
      * separately: with `protrusion: false` the overlay composes over an empty
      * base, and with `"none"` the protrusion model applies alone.
      *
+     * An object additionally chooses WHICH characters are marginal — see
+     * `HangingPunctuationOptions`.
+     *
      * Compatibility: `true` selects the default; `false` selects `"none"`;
      * `"first-line"` aliases `"first-line-and-line-ends"`; and `"all-lines"`
      * aliases `"all-line-edges"`.
      */
-    hangingPunctuation?: true | HangingPunctuationMode;
+    hangingPunctuation?: true | HangingPunctuationMode | HangingPunctuationOptions;
     /** Glyph expansion limits via the wdth axis; false disables. Fields left out
      * take their default, like `spacing` and `tracking`. */
     expansion?: Partial<ExpansionOptions> | false;
@@ -194,6 +200,39 @@ interface JustifyOptions {
     onSkip?: (paragraph: HTMLElement, reason: string) => void;
 }
 /**
+ * Hanging punctuation as its two independent parts: which characters are
+ * marginal, and where that classification applies.
+ *
+ * Membership carries no depth. A character is either outside the measure or
+ * it is not — how far a mark sits from the margin when it is NOT hung is the
+ * `protrusion` model's business, and writing a depth here would merge two
+ * features that answer different questions.
+ */
+interface HangingPunctuationOptions {
+    /** Which line edges the classification applies to, and on which lines.
+     * Defaults to the same policy the string form selects. */
+    edges?: HangingPunctuationMode;
+    /**
+     * Which characters are marginal. Each side REPLACES the built-in set for
+     * that side; a side left out keeps its default, so naming one edge never
+     * silently empties the other. Compose from the exported `hangingCharacters`
+     * to extend rather than replace:
+     *
+     * ```js
+     * characters: { start: hangingCharacters.start + "([{" }   // + CSS brackets
+     * characters: { end: "" }                                  // starts only
+     * ```
+     *
+     * Replacing `end` wholesale drops the CJK stops that make burasage work, so
+     * mixed Japanese and Latin text wants `hangingCharacters.end + "…"` rather
+     * than a bare list. Nothing is validated: a letter here will hang.
+     */
+    characters?: {
+        start?: string;
+        end?: string;
+    };
+}
+/**
  * The layout settings a live reconfiguration can replace. Everything else a
  * controller was built with — the hyphenator, callbacks, breaker penalties,
  * clipboard cleanup, resize observation — is fixed for its lifetime.
@@ -259,6 +298,13 @@ interface JustifyController {
      * `data-justif` attribute, but the controller still holds their measurements
      * and watches for a measure narrow enough to make line breaking useful. Test
      * this rather than the attribute to ask "is this enhancement still live?".
+     *
+     * The attribute answers the OTHER question, "is justif's rendering on the
+     * page right now?": every enhancement sets `data-justif` and every restore
+     * removes it, so a managed paragraph without the attribute is one the
+     * controller is watching but currently renders natively — a paragraph
+     * short enough for one line, or one whose leading float leaves no room to
+     * set beside it. Both signals are supported; they are two questions.
      */
     readonly managed: readonly HTMLElement[];
 }
