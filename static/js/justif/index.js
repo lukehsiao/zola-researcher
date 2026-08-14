@@ -1538,7 +1538,7 @@ var SHEET_TEXT =
 // one closer in — `!important`, or a nested inline the segments are cloned
 // into (`a{overflow-wrap:break-word}`). This rule is what covers Firefox
 // in those cases; Chromium consults the block container and ignores it.
-'.justif-seg,.justif-hyphen,.justif-break{overflow-wrap:normal;word-break:normal;line-break:auto}.justif-seg{white-space:nowrap}[data-justif-dropcap]::first-letter{all:unset!important}.justif-hyphen{white-space:nowrap}.justif-hyphen::after{content:"-"}.justif-no-transition{transition-property:none!important}.justif-break::after{content:"\u200B"}.justif-weld-end::after{content:"\u2060"}@supports (content:"-" / ""){.justif-hyphen::after{content:"-" / ""}.justif-break::after{content:"\u200B" / ""}.justif-weld-end::after{content:"\u2060" / ""}}';
+'.justif-seg,.justif-hyphen,.justif-break{overflow-wrap:normal;word-break:normal;line-break:auto}.justif-seg{white-space:nowrap}.justif-joint{font-size:0;line-height:0}[data-justif-dropcap]::first-letter{all:unset!important}.justif-hyphen{white-space:nowrap}.justif-hyphen::after{content:"-"}.justif-no-transition{transition-property:none!important}.justif-break::after{content:"\u200B"}.justif-weld-end::after{content:"\u2060"}@supports (content:"-" / ""){.justif-hyphen::after{content:"-" / ""}.justif-break::after{content:"\u200B" / ""}.justif-weld-end::after{content:"\u2060" / ""}}';
 var TEXT_AUTOSIZING_DECLARATIONS = [["-webkit-text-size-adjust", "100%"], ["text-size-adjust", "100%"]];
 function disableTextAutosizing(el) {
   for (const _ref5 of TEXT_AUTOSIZING_DECLARATIONS) {
@@ -1664,7 +1664,15 @@ function writeParagraph(p, contents, lineWidths, physicalFitLines, leadingFloat,
       const depth = Math.min(commonDepth(segment.ancestors), stack.length);
       stack.length = depth;
       const container2 = containerAt(depth);
-      if (segment.joint === "space") container2.append(doc.createTextNode(" "));else {
+      if (segment.joint === "space") {
+        const space = doc.createTextNode(" ");
+        if (segment.jointFlat !== true) container2.append(space);else {
+          const flat = doc.createElement("span");
+          flat.className = "justif-joint";
+          flat.append(space);
+          container2.append(flat);
+        }
+      } else {
         const brk = doc.createElement("span");
         brk.className = "justif-break";
         container2.append(brk);
@@ -2238,6 +2246,7 @@ function buildRenderSegments(scan, runsMetrics, para, lines, lineOffset) {
   }
   const segments = [];
   let pendingJoint = "none";
+  let pendingJointBesideFloat = false;
   const decorStartSeen = /* @__PURE__ */new Set();
   const lastSegForRun = /* @__PURE__ */new Map();
   let floatStyleEmitted = false;
@@ -2263,6 +2272,7 @@ function buildRenderSegments(scan, runsMetrics, para, lines, lineOffset) {
       return spec.wordSpacingPx + widthOffset + line.glueRatio * flex;
     };
     let joint = pendingJoint;
+    let jointFlat = pendingJoint === "space" && pendingJointBesideFloat;
     let first = true;
     let text = "";
     let run = -1;
@@ -2329,6 +2339,7 @@ function buildRenderSegments(scan, runsMetrics, para, lines, lineOffset) {
         decorPx,
         cjk: hasCJK,
         joint,
+        jointFlat: jointFlat ? true : void 0,
         marginStartOwner: first && line.leftHang > 0 ? srcRun.boxStartProtrusionOwner : void 0,
         // Assigned only to the line's actual final segment below. Pointing
         // multiple entries at one clone would make correction measurement
@@ -2339,6 +2350,7 @@ function buildRenderSegments(scan, runsMetrics, para, lines, lineOffset) {
       if (srcRun.padEndPx !== void 0) lastSegForRun.set(run, segments.length - 1);
       if (flowText.length > 0) {
         joint = "none";
+        jointFlat = false;
         first = false;
       }
       text = "";
@@ -2541,6 +2553,7 @@ function buildRenderSegments(scan, runsMetrics, para, lines, lineOffset) {
       }
     }
     const brk = para.items[line.end];
+    pendingJointBesideFloat = lineOffset + lineIndex < (scan.floatIntrusion?.lines ?? 0);
     if (line.hyphenated) pendingJoint = "hyphen";else if (brk !== void 0 && brk.type === ItemType.Glue) pendingJoint = "space";else if (brk !== void 0 && brk.type === ItemType.Penalty && brk.width === 0 && !brk.flagged) {
       pendingJoint = brk.cjk === true || brk.fixedSpace === true ? "wbr" : "space";
     } else pendingJoint = "wbr";
