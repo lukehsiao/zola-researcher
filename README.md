@@ -153,7 +153,8 @@ With the extension enabled, use the `katex` component:
 ### Justified text
 
 Publication-grade justification uses [justif](https://github.com/lyallcooper/justif), enabled by setting `justif_enable = true` in `[extra]`.
-All justif assets are served locally: `static/js/justif` is the unmodified `dist/` directory of the [justif npm package](https://www.npmjs.com/package/justif); to upgrade, replace it with a newer package's `dist/`.
+All justif assets are served locally: `static/js/justif` is the `dist/` directory of the [justif npm package](https://www.npmjs.com/package/justif), minified with esbuild and stripped of the source maps that minifying invalidates; to upgrade, replace it with a newer package's `dist/` and minify that.
+Minifying roughly halves the two files on the critical path, and the bundler's own content-hashed chunk names carry over untouched, so a cache can still treat them as immutable.
 
 With the extension enabled, the theme sets `<html lang="en-US" class="justif">`, justifies the prose inside `main`, and runs `static/js/justif-init.js`.
 That init module calls justif's JavaScript API so word-space stretch is capped (the `auto.js` drop-in exposes no spacing options); it scans the whole document and enhances only elements that CSS computes to `text-align: justify`, so centered captions and the left-aligned table of contents are left alone. A site can justify more by adding its own rules (its own stylesheet decides what is justified, wherever it lives).

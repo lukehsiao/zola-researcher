@@ -1,2 +1,1 @@
-export { hyphenateNb } from '../chunk-VIZFTCIC.js';
-import '../chunk-KTATQWFD.js';
+export{hyphenateNb}from"../chunk-VIZFTCIC.js";import"../chunk-KTATQWFD.js";
