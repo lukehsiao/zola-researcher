@@ -1,5 +1,24 @@
-import { H as HangingPunctuationMode, j as ProtrusionTable, E as ExpansionOptions, T as TrackingOptions } from './protrusion-fonts-B5ZKQ5nC.js';
-export { d as Line, m as composeProtrusion, p as fontProtrusion, r as hangingCharacters, s as hangingPunctuation, t as kinsokuNotAtLineEnd, u as kinsokuNotAtLineStart, v as latinProtrusion } from './protrusion-fonts-B5ZKQ5nC.js';
+import { H as HangingPunctuationMode, j as ProtrusionTable, E as ExpansionOptions, T as TrackingOptions } from './protrusion-fonts-BL6lNUIH.js';
+export { d as Line, m as composeProtrusion, p as fontProtrusion, r as hangingCharacters, s as hangingPunctuation, t as kinsokuNotAtLineEnd, u as kinsokuNotAtLineStart, v as latinProtrusion } from './protrusion-fonts-BL6lNUIH.js';
+
+/**
+ * The public option surface, and what it resolves to.
+ *
+ * Two audiences meet here. Outward, this is the documented API — every knob a
+ * caller can turn, with the typographic reasoning behind its default, because
+ * a justification setting whose consequence is not explained is a setting
+ * nobody can choose between. Inward, `resolveOptions` turns that into the
+ * flat, fully-defaulted shape the layout actually runs on, once per
+ * controller.
+ *
+ * Pure by construction: nothing here touches the DOM, so what a controller
+ * will do with a given option object can be worked out without a document.
+ *
+ * The split between the public defaults and the CORE defaults in
+ * ./core/types.js is deliberate and shows up repeatedly below. The core is
+ * classic TeX; the public API is Bringhurst. `lastLineMinWidth` and
+ * `tracking` are both core-off, public-on for that reason.
+ */
 
 interface JustifyOptions {
     /** Word splitter, e.g. `hyphenateEnUS` from "justif/hyphenate/en-us".
@@ -208,6 +227,42 @@ interface HangingPunctuationOptions {
  * clipboard cleanup, resize observation — is fixed for its lifetime.
  */
 type LayoutOptions = Pick<JustifyOptions, "hangingPunctuation" | "protrusion" | "expansion" | "tracking" | "spacing" | "lastLineMinWidth" | "lastLineFit">;
+/**
+ * What each `LayoutOptions` field resolves to when omitted. Exported so callers
+ * can tell "the author asked for the default" apart from "the author asked for
+ * something that happens to equal it" — the drop-in needs exactly that to avoid
+ * splitting paragraphs into separate controllers over identical settings — and
+ * so configuration UI has one source for its initial values.
+ *
+ * Declared after the constants it reads: a `const` is not initialized until its
+ * own statement runs, so hoisting this above them would throw at module load.
+ */
+declare const layoutDefaults: Readonly<{
+    hangingPunctuation: "line-end-only";
+    protrusion: true;
+    expansion: ExpansionOptions;
+    tracking: TrackingOptions;
+    spacing: {
+        stretch: number;
+        shrink: number;
+        pull: number;
+        boundaryShrink: number;
+    };
+    lastLineMinWidth: 0.33;
+    lastLineFit: 0;
+}>;
+
+/**
+ * justif — text justification for perfectionists.
+ *
+ * `justify(document.querySelectorAll("p"))` re-lays-out existing paragraphs
+ * with Knuth-Plass optimal line breaking, character protrusion (optical
+ * margin alignment, per-font via measured glyph geometry), font expansion
+ * on variable fonts with a wdth axis, and optional letterfit tracking
+ * (Bringhurst's ±3%). Resize re-runs arithmetic only; `destroy()` restores
+ * the original DOM.
+ */
+
 interface JustifyController {
     /**
      * Resolves once the content's font faces have settled (loaded or
@@ -278,30 +333,6 @@ interface JustifyController {
      */
     readonly managed: readonly HTMLElement[];
 }
-/**
- * What each `LayoutOptions` field resolves to when omitted. Exported so callers
- * can tell "the author asked for the default" apart from "the author asked for
- * something that happens to equal it" — the drop-in needs exactly that to avoid
- * splitting paragraphs into separate controllers over identical settings — and
- * so configuration UI has one source for its initial values.
- *
- * Declared after the constants it reads: a `const` is not initialized until its
- * own statement runs, so hoisting this above them would throw at module load.
- */
-declare const layoutDefaults: Readonly<{
-    hangingPunctuation: "line-end-only";
-    protrusion: true;
-    expansion: ExpansionOptions;
-    tracking: TrackingOptions;
-    spacing: {
-        stretch: number;
-        shrink: number;
-        pull: number;
-        boundaryShrink: number;
-    };
-    lastLineMinWidth: 0.33;
-    lastLineFit: 0;
-}>;
 declare function justify(targets: Element | Iterable<Element>, options?: JustifyOptions): JustifyController;
 /** Restore paragraphs enhanced by any controller to their original DOM. */
 declare function unjustify(targets: Element | Iterable<Element>): void;

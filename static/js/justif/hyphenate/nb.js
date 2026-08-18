@@ -1,1 +1,1 @@
-export{hyphenateNb}from"../chunk-VIZFTCIC.js";import"../chunk-KTATQWFD.js";
+export{hyphenateNb}from"../chunk-EOWGU75H.js";import"../chunk-ZW2EUTPS.js";

@@ -126,6 +126,16 @@ interface RunText {
      * adjacent nowrap chips remains breakable.
      */
     atomicKey?: number;
+    /**
+     * This piece is an ATOMIC BOX — an inline-level object the model places
+     * but never looks inside (an equation, an inline-block chip): a rigid
+     * advance of `widthPx` with no text of its own. `text` is empty, and the
+     * box it produces takes no protrusion, no expansion and no letterfit,
+     * because none of them can move an object the model cannot reshape.
+     */
+    atomic?: {
+        widthPx: number;
+    };
 }
 declare const ItemType: {
     readonly Box: 0;
@@ -184,6 +194,10 @@ interface Box {
      * glyph run's own advance is width − padPx: expansion gain must scale
      * only the glyphs, never the box decorations. */
     padPx?: number;
+    /** An atomic object box (RunText.atomic): rigid width, empty text. It
+     * occupies flow like any box, but renderers must emit the object rather
+     * than text for it, and nothing that reshapes glyphs may touch it. */
+    atomic?: true;
 }
 interface Glue {
     type: typeof ItemType.Glue;
@@ -236,6 +250,11 @@ interface Penalty {
     cjk?: boolean;
     /** Soft-wrap boundary after a complete fixed-width separator run. */
     fixedSpace?: boolean;
+    /** Break at an atomic object's junction (see ATOMIC_BREAK_PENALTY). Like
+     * the CJK breaks, the site has NO source space, so a line broken here must
+     * render a zero-width joint rather than the space a hand-built penalty in
+     * front of a glue stands for. */
+    atomic?: boolean;
 }
 type Item = Box | Glue | Penalty;
 /** Protrusion codes in thousandths of the glyph's own advance (pdfTeX).

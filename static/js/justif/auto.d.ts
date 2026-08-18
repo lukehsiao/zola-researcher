@@ -31,6 +31,25 @@ interface TrackingOptions {
  */
 type HangingPunctuationMode = false | "none" | "line-end-only" | "first-line-and-line-ends" | "all-line-edges" | "first-line" | "all-lines";
 
+/**
+ * The public option surface, and what it resolves to.
+ *
+ * Two audiences meet here. Outward, this is the documented API — every knob a
+ * caller can turn, with the typographic reasoning behind its default, because
+ * a justification setting whose consequence is not explained is a setting
+ * nobody can choose between. Inward, `resolveOptions` turns that into the
+ * flat, fully-defaulted shape the layout actually runs on, once per
+ * controller.
+ *
+ * Pure by construction: nothing here touches the DOM, so what a controller
+ * will do with a given option object can be worked out without a document.
+ *
+ * The split between the public defaults and the CORE defaults in
+ * ./core/types.js is deliberate and shows up repeatedly below. The core is
+ * classic TeX; the public API is Bringhurst. `lastLineMinWidth` and
+ * `tracking` are both core-off, public-on for that reason.
+ */
+
 interface JustifyOptions {
     /** Word splitter, e.g. `hyphenateEnUS` from "justif/hyphenate/en-us".
      * Never called for RTL paragraphs (Arabic joining makes fragment
@@ -238,6 +257,18 @@ interface HangingPunctuationOptions {
  * clipboard cleanup, resize observation — is fixed for its lifetime.
  */
 type LayoutOptions = Pick<JustifyOptions, "hangingPunctuation" | "protrusion" | "expansion" | "tracking" | "spacing" | "lastLineMinWidth" | "lastLineFit">;
+
+/**
+ * justif — text justification for perfectionists.
+ *
+ * `justify(document.querySelectorAll("p"))` re-lays-out existing paragraphs
+ * with Knuth-Plass optimal line breaking, character protrusion (optical
+ * margin alignment, per-font via measured glyph geometry), font expansion
+ * on variable fonts with a wdth axis, and optional letterfit tracking
+ * (Bringhurst's ±3%). Resize re-runs arithmetic only; `destroy()` restores
+ * the original DOM.
+ */
+
 interface JustifyController {
     /**
      * Resolves once the content's font faces have settled (loaded or
@@ -335,9 +366,13 @@ declare function unjustify(targets: Element | Iterable<Element>): void;
  * paragraphs, because that is where element-scoped settings belong: the cascade
  * decides precedence, so there is none to invent here. Paragraphs group by
  * language AND resolved configuration, so configuring nothing still costs
- * exactly one controller per language. auto-options.ts owns that surface;
- * changes to it apply on their own where the engine allows, which
- * `liveUpdatesSupported` gates and `armWatcher` sets up.
+ * exactly one controller per language. auto-options.ts owns that surface, and
+ * auto-watch.ts is what makes changes to it apply on their own where the
+ * engine allows. Which patterns a language wants, and what it costs to get
+ * them, is auto-languages.ts.
+ *
+ * What is left here is the orchestration: grouping the page, starting a
+ * controller per group, and reconciling that against what the CSS now says.
  *
  * The script tag carries only what is not element-scoped:
  *   data-justif-selector="article p"   candidate elements (default below)
