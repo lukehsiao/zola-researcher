@@ -376,6 +376,8 @@ declare function unjustify(targets: Element | Iterable<Element>): void;
  *
  * The script tag carries only what is not element-scoped:
  *   data-justif-selector="article p"   candidate elements (default below)
+ *   data-justif-defer                  read the page after the page's own
+ *                                      DOMContentLoaded work, not before it
  *
  * Controllers are exposed at `window.justif.controllers` (with `justify`
  * and `unjustify`) as an escape hatch for debugging or teardown, and
