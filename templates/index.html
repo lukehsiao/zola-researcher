@@ -16,7 +16,7 @@
     {%- endblock ogtype -%}
     <title>{{ title }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="color-scheme" content="dark">
+    <meta name="color-scheme" content="light dark">
     <meta name="author" content="{{ config.extra.author }}">
     <meta name="description" content="{{ desc }}">
     {% if config.extra.analytics -%}
@@ -58,6 +58,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
     {%- endif %}
     {% block favicon -%}
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#fffcf0">
     <meta name="theme-color" content="#100f0f">
     <link rel="icon" href="{{ get_url(path="favicon.ico") }}" sizes="32x32">
     <link rel="icon" href="{{ get_url(path="favicon.svg") }}" type="image/svg+xml">

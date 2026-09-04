@@ -1,19 +1,20 @@
 @import "vars";
 
-/* Per-type colors */
+/* Per-type colors: Flexoki's 100/600/850 steps on paper and 900/400/150 on
+   black, for the background, stripe, and header text respectively. */
 $asides: (
-  note: (bg: rgb(18, 37, 59),
-    stripe: rgb(67, 133, 190),
-    accent: rgb(171, 207, 226)),
-  tip: (bg: rgb(57, 23, 43),
-    stripe: rgb(206, 93, 151),
-    accent: rgb(249, 185, 207)),
-  caution: (bg: rgb(58, 45, 4),
-    stripe: rgb(208, 162, 21),
-    accent: rgb(241, 214, 126)),
-  danger: (bg: rgb(62, 23, 21),
-    stripe: rgb(209, 77, 65),
-    accent: rgb(253, 178, 162))
+  note: (bg: light-dark(rgb(198, 221, 232), rgb(18, 37, 59)),
+    stripe: $blue,
+    accent: light-dark(rgb(19, 48, 81), rgb(171, 207, 226))),
+  tip: (bg: light-dark(rgb(252, 207, 218), rgb(57, 23, 43)),
+    stripe: $magenta,
+    accent: light-dark(rgb(79, 27, 57), rgb(249, 185, 207))),
+  caution: (bg: light-dark(rgb(246, 226, 160), rgb(58, 45, 4)),
+    stripe: $yellow,
+    accent: light-dark(rgb(80, 61, 2), rgb(241, 214, 126))),
+  danger: (bg: light-dark(rgb(255, 202, 187), rgb(62, 23, 21)),
+    stripe: $red,
+    accent: light-dark(rgb(85, 27, 24), rgb(253, 178, 162)))
 );
 
 /* Base aside styles */
@@ -68,7 +69,7 @@ $asides: (
   }
 }
 
-/* Generate per-type classes and interpolate map values so real rgb(...) is emitted */
+/* Generate per-type classes and interpolate map values so real color values are emitted */
 @each $name, $props in $asides {
   .aside--#{$name} {
     --aside-bg: #{map-get($props, bg)};

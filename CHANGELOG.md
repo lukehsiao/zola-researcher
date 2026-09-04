@@ -6,6 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- A light palette. Every color is a `light-dark()` pair of Flexoki's light and dark values, so the theme follows the system color scheme with no toggle or JavaScript. Browsers without `light-dark()` support (before Chrome 123, Firefox 120, and Safari 17.5) fall back to their default colors.
+
+### Changed
+- `<meta name="color-scheme">` declares `light dark`, and `theme-color` is set per scheme.
+- The example configuration highlights code with `light_theme` and `dark_theme` (Catppuccin Latte and Mocha) so code blocks follow the scheme.
+
 ## [0.3.0]
 
 This is a breaking change to adopt Zola 0.23.0.

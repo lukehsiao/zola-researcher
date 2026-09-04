@@ -3,8 +3,12 @@
 /*
  * Font stacks are custom properties so a site can override them from its own
  * stylesheet without forking the theme's sass.
+ *
+ * color-scheme lets the light-dark() pairs in vars.scss pick a side; without
+ * it every color resolves to its light value regardless of the system setting.
  */
 :root {
+  color-scheme: light dark;
   --font-body: "Atkinson Hyperlegible Next", sans-serif;
   --font-mono: ui-monospace, Iosevka, Hack, Menlo, Consolas, Monaco, "Liberation Mono", "Lucida Console", monospace;
 }

@@ -1,7 +1,7 @@
 # Researcher
 
 Researcher is a clean, responsive portfolio and blog theme for [Zola](https://www.getzola.org/), based on the [Jekyll theme of the same name](https://github.com/ankitsultana/researcher).
-It uses a dark, [Flexoki](https://stephango.com/flexoki)-inspired palette and ships everything it needs: fonts, icons, math rendering, and feed styling all work offline with no CDN dependencies (unless you opt into them).
+It uses a [Flexoki](https://stephango.com/flexoki)-inspired palette that follows the system color scheme, light or dark, and ships everything it needs: fonts, icons, math rendering, and feed styling all work offline with no CDN dependencies (unless you opt into them).
 
 [Demo website](https://zola-researcher.pages.dev)
 
@@ -11,6 +11,7 @@ It uses a dark, [Flexoki](https://stephango.com/flexoki)-inspired palette and sh
 
 - Portfolio landing page plus a paginated blog with an Atom feed
 - Bundled [Atkinson Hyperlegible Next](https://www.brailleinstitute.org/freefont/) variable font (SIL OFL 1.1)
+- Light and dark palettes that follow the system color scheme, with no toggle or JavaScript
 - KaTeX math rendering, rendered client-side with locally hosted assets
 - Components for figures, YouTube embeds, asides/admonitions, and wide tables
 - Human-friendly XSLT-styled Atom feed
@@ -131,6 +132,12 @@ For example, create `sass/css/custom.scss` in your site:
 ```
 
 and load it via `custom_css = ["css/custom.css"]` in `[extra]`.
+
+### Color scheme
+
+The palette follows the system preference through CSS `light-dark()`, so there is no toggle and no JavaScript.
+Browsers without `light-dark()` support (before Chrome 123, Firefox 120, and Safari 17.5) drop those declarations and fall back to their default colors.
+Pair it with Zola's `light_theme` and `dark_theme` highlighting options so code blocks switch too; see this repository's `zola.toml`.
 
 ### Favicon
 
