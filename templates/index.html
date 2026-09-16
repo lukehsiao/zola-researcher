@@ -50,12 +50,12 @@
     <script defer src="{{ get_url(path="/js/mathtex-script-type.min.js") }}"></script>
     {% endif %}
     {% if config.extra.search_enable -%}
-    <script type="module" src="{{ get_url(path="/js/search.js") }}"></script>
+    <script type="module" src="{{ get_url(path="/js/search.js", cachebust=true) }}"></script>
     {%- endif %}
     <link rel="preload" href="{{ get_url(path="/fonts/AtkinsonHyperlegibleNextVF-Variable.woff2") }}" as="font" type="font/woff2" crossorigin>
-    <link rel="stylesheet" href="{{ get_url(path="/css/main.css") }}">
+    <link rel="stylesheet" href="{{ get_url(path="/css/main.css", cachebust=true) }}">
     {%- for css in config.extra.custom_css | default(value=[]) %}
-    <link rel="stylesheet" href="{{ get_url(path=css) }}">
+    <link rel="stylesheet" href="{{ get_url(path=css, cachebust=true) }}">
     {%- endfor %}
     {% if config.extra.fontawesome -%}
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
