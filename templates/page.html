@@ -31,7 +31,7 @@
     <h1 itemprop="headline" class="post__title">
       {{ page.title }}
     </h1>
-    <div class="post__meta">
+    <div class="post__meta" data-pagefind-ignore>
       <span class="post__author">
         {%- if page.authors -%}
         {{ page.authors[0] }}
@@ -61,7 +61,7 @@
     </div>
   </header>
   {% if page.toc and page.extra.toc -%}
-  <div class="toc">
+  <div class="toc" data-pagefind-ignore>
     <strong>Contents</strong>
     <div>
       <nav id="TableOfContents">

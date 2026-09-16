@@ -158,5 +158,6 @@ analytics = ""
 katex_enable = true
 justif_enable = true
 instantpage_enable = true
+search_enable = true
 fontawesome = false
 

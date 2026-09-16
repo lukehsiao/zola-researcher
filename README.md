@@ -13,6 +13,7 @@ It uses a [Flexoki](https://stephango.com/flexoki)-inspired palette that follows
 - Bundled [Atkinson Hyperlegible Next](https://www.brailleinstitute.org/freefont/) variable font (SIL OFL 1.1)
 - Light and dark palettes that follow the system color scheme, with no toggle or JavaScript
 - KaTeX math rendering, rendered client-side with locally hosted assets
+- Site search over the whole site, with a keyboard-driven popover (optional)
 - Components for figures, YouTube embeds, asides/admonitions, and wide tables
 - Human-friendly XSLT-styled Atom feed
 - [instant.page](https://instant.page/) prefetching (optional)
@@ -105,6 +106,9 @@ instantpage_enable = true
 # Load Font Awesome from its CDN; see below.
 fontawesome = false
 
+# Pagefind site search; see below. Requires a build step.
+search_enable = false
+
 # Extra stylesheets, relative to the site root, loaded after the theme's own
 # CSS. Useful for overriding fonts or colors without forking the theme.
 custom_css = []
@@ -143,6 +147,41 @@ Pair it with Zola's `light_theme` and `dark_theme` highlighting options so code 
 
 The theme ships a generic `favicon.ico` and `favicon.svg`.
 Replace them by putting your own files at the same paths in your site's `static` directory.
+
+### Site search
+
+Search uses [Pagefind](https://pagefind.app/), enabled by setting `search_enable = true` in `[extra]`.
+Pagefind indexes the built HTML rather than the Markdown sources, so it runs after Zola, on every build:
+
+```bash
+zola build
+pagefind --site public
+```
+
+`zola serve` never runs the second step, but it keeps only HTML in memory and serves everything else out of `public/`, so an index left there by an earlier build is served as-is: search works in a live-reload preview, answering from that snapshot rather than from the page you are editing.
+On a host that builds for you, the second step has to go in the build command: on Cloudflare Pages, for instance, the Zola preset runs `zola build`, and the command becomes `zola build && npm_config_yes=true npx pagefind --site public`.
+Pin that version (`pagefind@1.5.2`) if you want reproducible builds; the theme themes the UI through Pagefind's documented `--pf-*` properties, so tracking the latest release is also fine.
+Zola's own `build_search_index` plays no part in any of this and can stay off.
+
+With search enabled, the navbar grows a magnifier button after the last link, and `Ctrl`/`Cmd`+`K` and `/` open it too.
+The modal itself is Pagefind's own `<pagefind-modal>` web component, so its focus handling, result navigation, screen reader announcements, and translations come from upstream; the theme contributes the button, the two shortcuts, and the colors.
+Its script and stylesheet are fetched on the first search rather than on every page view, which keeps around 210KB off the critical path of a visitor who never searches.
+If the bundle is missing, because the site was built without the Pagefind step, the button disables itself and says so instead of doing nothing.
+
+Colors come from the `--pf-*` custom properties, set on `pagefind-modal` in `sass/css/search.scss`.
+Pagefind's components reset inherited styles on themselves, so those properties are the whole theming surface; a site that overrides the theme's palette should override them too.
+
+What gets indexed is decided in the templates:
+
+- `index.html` marks `<main>` with `data-pagefind-body`, so a result links to a page, never to a fragment of the chrome around it.
+- `section.html` and `404.html` clear that mark through the `main_attrs` block, which keeps listing pages (whose text is just the titles of the posts they link to) out of the results. Do the same in your own templates for pages that should not be hits.
+- Post bylines and tables of contents carry `data-pagefind-ignore`, so a search for a word in a heading finds the heading rather than the table of contents entry that repeats it.
+
+Headings keep their anchors in the index, so a result expands into the sections that matched and links straight to them.
+
+If your site sends a `Content-Security-Policy`, two directives need widening: `script-src` needs `'wasm-unsafe-eval'`, because Pagefind's index is a WebAssembly module, and `img-src` needs `data:`, because the icons in its search UI are inline SVGs.
+Without the first, the modal opens and never returns results; without the second, everything works but those icons are missing.
+Pagefind searches in a web worker, which it loads from your own origin, so the `script-src` fallback covers it and no `worker-src` is needed.
 
 ### KaTeX math formulas
 

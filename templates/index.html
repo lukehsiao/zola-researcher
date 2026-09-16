@@ -49,6 +49,9 @@
     <script defer src="{{ get_url(path="/js/katex.min.js") }}"></script>
     <script defer src="{{ get_url(path="/js/mathtex-script-type.min.js") }}"></script>
     {% endif %}
+    {% if config.extra.search_enable -%}
+    <script type="module" src="{{ get_url(path="/js/search.js") }}"></script>
+    {%- endif %}
     <link rel="preload" href="{{ get_url(path="/fonts/AtkinsonHyperlegibleNextVF-Variable.woff2") }}" as="font" type="font/woff2" crossorigin>
     <link rel="stylesheet" href="{{ get_url(path="/css/main.css") }}">
     {%- for css in config.extra.custom_css | default(value=[]) %}
@@ -100,19 +103,46 @@
             {%- for x in config.extra.nav -%}
             <li class="alignable pull-left nav-list"><a href="{{ config.base_url | safe }}{{ x.link | safe }}">/{{ x.name | lower }}</a></li>
             {%- endfor %}
+            {#- The trim markers keep this item hard against the last link,
+                the way the loop above does for the links themselves. A phone
+                lays the navbar out as inline blocks, where the whitespace
+                between two items is a rendered space that counts against the
+                width of the row. -#}
+            {%- if config.extra.search_enable -%}
+            <li class="alignable pull-left nav-list nav-list--search"><button type="button" id="search-button" class="search-button" aria-label="Search" aria-haspopup="dialog" aria-expanded="false" aria-keyshortcuts="Control+K Meta+K /" title="Search (Ctrl+K or /)"><svg
+                  xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                  class="lucide lucide-search" aria-hidden="true">
+                  <path d="m21 21-4.34-4.34" />
+                  <circle cx="11" cy="11" r="8" />
+                </svg></button></li>
+            {%- endif -%}
           </ul>
         </div>
       </nav>
       <div class="clear"></div>
       <hr>
       <div class="container content">
-        <main>
+        {#- Pagefind indexes only elements marked data-pagefind-body, and once
+            any page carries the mark, pages without it are left out entirely.
+            Templates whose main content is not worth a search hit (section
+            listings, 404) override main_attrs to drop it. -#}
+        <main{% block main_attrs %}{% if config.extra.search_enable %} data-pagefind-body{% endif %}{% endblock main_attrs %}>
         {% block content %}{{ section.content | safe }}{% endblock content %}
         </main>
         {% block webring %}{% endblock webring %}
       </div>
     </div>
     {%- endblock body %}
+    {%- if config.extra.search_enable %}
+    {#- Pagefind's own web components own the modal: focus handling, keyboard
+        navigation of results, the mobile close button, and translations all
+        come from upstream. The config element has to precede the modal in the
+        DOM, because whichever element upgrades first fixes the bundle path for
+        the instance. -#}
+    <pagefind-config bundle-path="{{ get_url(path="/pagefind/", trailing_slash=true) }}"></pagefind-config>
+    <pagefind-modal></pagefind-modal>
+    {%- endif %}
     <footer class="footer">
     {%- block footer %}
       <hr />

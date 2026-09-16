@@ -32,6 +32,10 @@ katex_enable = false
 # instant.page prefetching; see README
 instantpage_enable = true
 
+# Pagefind site search; requires a `pagefind` run after `zola build`. See
+# README.
+search_enable = false
+
 # Load Font Awesome from its CDN; see README
 fontawesome = false
 

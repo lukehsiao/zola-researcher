@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Optional [Pagefind](https://pagefind.app/) site search, behind `search_enable`. A magnifier button in the navbar, `Ctrl`/`Cmd`+`K`, or `/` opens Pagefind's `<pagefind-modal>` over the blurred page, themed with the Flexoki palette through its `--pf-*` properties. The component bundle is fetched on the first search, so a visitor who never searches pays nothing for it. Search needs a `pagefind --site public` run after `zola build`, which also means a build command change on hosts that build for you; see the README.
+- A `main_attrs` block in `index.html`, which `section.html` and `404.html` override to keep themselves out of the search index.
+- `$blue-2`, the accent pair inverted: Flexoki's 400 step on paper and its 600 step on black. The search icon uses it so it does not read as the loudest thing in the navbar.
 - A light palette. Every color is a `light-dark()` pair of Flexoki's light and dark values, so the theme follows the system color scheme with no toggle or JavaScript. Browsers without `light-dark()` support (before Chrome 123, Firefox 120, and Safari 17.5) fall back to their default colors.
 
 ### Changed

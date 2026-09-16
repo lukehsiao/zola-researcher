@@ -1,0 +1,127 @@
+@import "vars";
+
+/*
+ * The icon needs less separation from the last link than the links need from
+ * each other, and nothing follows it, so its own margins are free width. That
+ * width matters: a five-link navbar comes within a few pixels of a 360px
+ * viewport, and the icon has to fit in what is left.
+ */
+#navlist .nav-list--search {
+  margin: 0;
+  padding-left: 0.25rem;
+}
+
+/*
+ * The trigger is icon-only, which is what keeps it from forcing another row
+ * onto a phone navbar; the shortcuts live in aria-keyshortcuts and the
+ * tooltip rather than in a visible hint that would cost that space back.
+ */
+.search-button {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: none;
+  /* A step softer than the nav links: the icon is a tool, not a destination,
+     and at full accent strength it reads as the loudest thing in the row. */
+  color: $blue-2;
+  cursor: pointer;
+  /* A button inherits neither the page font nor its size, and the em lengths
+     here are meant to be relative to the nav links beside it. */
+  font: inherit;
+  /*
+   * Match the nav links' line box, so the icon adds nothing to the row's
+   * height. vertical-align is part of that: an inline flex box has no
+   * baseline of its own, so it would sit on the text baseline and hang above
+   * the line, making the row taller.
+   */
+  height: 1.25em;
+  vertical-align: top;
+
+  /*
+   * Grow the pointer target to the 24px minimum without disturbing the row.
+   * Padding cannot do this: the navbar lays its items out as inline-level
+   * boxes, so padding lands in the line box and pushes the row taller, and
+   * the row has to stay on one line on a phone.
+   *
+   * The leftward growth is bounded by the gap the list item already leaves
+   * before the icon, so the overlay never covers the last nav link and
+   * cannot swallow clicks meant for it. Vertically it stays inside the
+   * list's own padding.
+   */
+  &::after {
+    content: "";
+    position: absolute;
+    inset: -0.35rem -0.4rem -0.35rem -0.25rem;
+  }
+
+  svg {
+    /* The glyph is drawn to the edges of its box, so matching the text's font
+       size would make it read larger than the words beside it. This is about
+       the cap height of the nav links. */
+    height: 0.9em;
+    width: 0.9em;
+  }
+
+  /* Hover takes it up to the strength of the links it sits among. */
+  &:hover {
+    color: $blue;
+  }
+
+  /* The unavailable state stays focusable, so it keeps aria-disabled rather
+     than the disabled attribute; both need the muted treatment. */
+  &[aria-disabled="true"] {
+    color: $tx-3;
+    cursor: default;
+  }
+}
+
+/*
+ * Pagefind's components reset inherited styles on themselves, so these
+ * custom properties are the whole theming surface. They are declared on the
+ * modal rather than on :root because Pagefind's own stylesheet, which loads
+ * later, redeclares its defaults on :root for both color schemes; a value set
+ * on the element itself wins over anything inherited, whatever the order.
+ */
+pagefind-modal {
+  --pf-text: #{$tx};
+  --pf-text-secondary: #{$tx-2};
+  --pf-text-muted: #{$tx-2};
+  --pf-background: #{$bg};
+  --pf-border: #{$ui-2};
+  --pf-border-focus: #{$tx-3};
+  --pf-hover: #{$bg-2};
+  --pf-skeleton: #{$ui};
+  --pf-skeleton-shine: #{$ui-2};
+  --pf-mark: #{$tx};
+  --pf-outline-focus: #{$blue};
+  --pf-error-bg: #{$bg-2};
+  --pf-error-border: #{$ui-2};
+  --pf-error-text: #{$red};
+  --pf-error-text-secondary: #{$red};
+  --pf-font: var(--font-body);
+  --pf-border-radius: 0.5rem;
+  /* The page's own measure, so a result reads at the width of the prose it
+     came from. */
+  --pf-modal-max-width: #{$max-width};
+  --pf-modal-backdrop: #{light-dark(rgba(16, 15, 15, 0.5), rgba(16, 15, 15, 0.7))};
+}
+
+/*
+ * Pagefind renders the modal as a real <dialog>, so the page behind it is
+ * dimmed by ::backdrop. Pagefind sets the color there and nothing else, which
+ * leaves the blur to us.
+ */
+dialog.pf-modal::backdrop {
+  backdrop-filter: blur(0.25rem);
+}
+
+/*
+ * Pagefind stops the page behind the modal from scrolling with overflow on
+ * the backdrop, which only Chromium honours so far, so the lock is repeated
+ * here in a form every engine applies.
+ */
+html:has(pagefind-modal dialog[open]) {
+  overflow: hidden;
+}

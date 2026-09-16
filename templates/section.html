@@ -6,6 +6,9 @@
 {% block perm -%}
 {%- set perm = current_url | default(value=section.permalink) -%}
 {%- endblock perm %}
+{# Listing pages repeat the titles of the posts they link to; the posts
+   themselves are the useful hits. #}
+{% block main_attrs %}{% endblock main_attrs %}
 
 {% block content %}
 <h1 class="post__title">{{ section.title }}</h1>
