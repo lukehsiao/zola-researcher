@@ -474,8 +474,10 @@ h6:hover .zola-anchor {
 .giallo-ln {
   display: inline-block;
   user-select: none;
-  margin-right: 0.4em;
-  padding: 0.4em;
+  margin-right: 1ch;
+  /* Fits three-digit line numbers, so every block's code starts at the same
+     indent regardless of its length. The pre's own padding supplies the left
+     inset, and vertical padding here would stretch every numbered line. */
   min-width: 3ch;
   text-align: right;
   opacity: 0.8;
