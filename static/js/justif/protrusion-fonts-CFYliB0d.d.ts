@@ -80,6 +80,12 @@ interface RunMetrics {
      */
     familyKey?: string;
 }
+/** Fixed inline-boundary advance and the portion allowed outside the measure.
+ * Both values are in px; neither participates in glyph expansion. */
+interface InlineEdge {
+    advancePx: number;
+    protrusionPx: number;
+}
 /** A piece of paragraph text in one run, in document order. */
 interface RunText {
     text: string;
@@ -118,6 +124,11 @@ interface RunText {
      */
     padStartPx?: number;
     padEndPx?: number;
+    /** Resolved boundaries, replacing the corresponding padding and fixed
+     * protrusion fields above. A zero protrusion still marks a real edge,
+     * suppressing character hanging there without affecting internal slices. */
+    startEdge?: InlineEdge;
+    endEdge?: InlineEdge;
     /**
      * Set when this piece lives inside a `white-space: nowrap` inline
      * element: no break opportunity may be created between two boxes that
@@ -172,7 +183,7 @@ interface Box {
      * breakpoint, and an absent field there costs more than the field does. */
     hangStretch: number;
     hangShrink: number;
-    /** This is the actual final box of a painted inline. Renderers use the
+    /** This is the actual final box of a fixed inline boundary. Renderers use the
      * marker (independent of rp, which may legitimately be zero) to keep
      * wrap-safety margins outside the decoration instead of pinching it. */
     paintedEnd?: boolean;
@@ -190,7 +201,7 @@ interface Box {
      * the end of this box and must emit a zero-width joint rather than inserting
      * an ordinary space. */
     otherSpace?: boolean;
-    /** Inline padding/border px folded into `width` (RunText extras). The
+    /** Fixed inline-boundary px folded into `width` (RunText extras). The
      * glyph run's own advance is width − padPx: expansion gain must scale
      * only the glyphs, never the box decorations. */
     padPx?: number;
@@ -659,4 +670,4 @@ declare function composeProtrusion(base: ProtrusionTable, user: ProtrusionTable 
  */
 declare function fontProtrusion(familyList: string): ProtrusionTable | undefined;
 
-export { type BuildOptions as B, CJK_CHAR as C, type ExpansionOptions as E, type Glue as G, type HangingPunctuationMode as H, type Item as I, type LineWidths as L, type Measure as M, type ParagraphItems as P, type RunText as R, type TrackingOptions as T, type RunMetrics as a, type BreakOptions as b, type BreakResult as c, type Line as d, type Box as e, type GlueSpec as f, ItemType as g, type Penalty as h, type ProtrusionCodes as i, type ProtrusionTable as j, caseTransformedText as k, cjkBreakAllowed as l, composeProtrusion as m, defaultBreakOptions as n, defaultBuildOptions as o, fontProtrusion as p, graphemes as q, hangingCharacters as r, hangingPunctuation as s, kinsokuNotAtLineEnd as t, kinsokuNotAtLineStart as u, latinProtrusion as v, lineWidthAt as w, protrusionCodes as x };
+export { type BuildOptions as B, CJK_CHAR as C, type ExpansionOptions as E, type Glue as G, type HangingPunctuationMode as H, type Item as I, type LineWidths as L, type Measure as M, type ParagraphItems as P, type RunText as R, type TrackingOptions as T, type RunMetrics as a, type BreakOptions as b, type BreakResult as c, type Line as d, type Box as e, type GlueSpec as f, type InlineEdge as g, ItemType as h, type Penalty as i, type ProtrusionCodes as j, type ProtrusionTable as k, caseTransformedText as l, cjkBreakAllowed as m, composeProtrusion as n, defaultBreakOptions as o, defaultBuildOptions as p, fontProtrusion as q, graphemes as r, hangingCharacters as s, hangingPunctuation as t, kinsokuNotAtLineEnd as u, kinsokuNotAtLineStart as v, latinProtrusion as w, lineWidthAt as x, protrusionCodes as y };

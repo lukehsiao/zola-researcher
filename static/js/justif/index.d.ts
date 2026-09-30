@@ -1,5 +1,5 @@
-import { H as HangingPunctuationMode, j as ProtrusionTable, E as ExpansionOptions, T as TrackingOptions } from './protrusion-fonts-BL6lNUIH.js';
-export { d as Line, m as composeProtrusion, p as fontProtrusion, r as hangingCharacters, s as hangingPunctuation, t as kinsokuNotAtLineEnd, u as kinsokuNotAtLineStart, v as latinProtrusion } from './protrusion-fonts-BL6lNUIH.js';
+import { H as HangingPunctuationMode, k as ProtrusionTable, E as ExpansionOptions, T as TrackingOptions } from './protrusion-fonts-CFYliB0d.js';
+export { d as Line, n as composeProtrusion, q as fontProtrusion, s as hangingCharacters, t as hangingPunctuation, u as kinsokuNotAtLineEnd, v as kinsokuNotAtLineStart, w as latinProtrusion } from './protrusion-fonts-CFYliB0d.js';
 
 /**
  * The public option surface, and what it resolves to.
