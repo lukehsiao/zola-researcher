@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Printing a post from Firefox or another Gecko browser no longer leaves a wide gap after the published and updated dates in the metadata line. The print reset styled `::first-letter`, which made Gecko widen each item that holds a `<time>`. The reset no longer targets `::first-letter` or `::first-line`.
 - Justified prose no longer clips at the right edge when printed from a wide Chrome, Brave, or Edge window. With `justif_enable`, the content column prints at a fixed 6.25in measure, which fits US Letter and A4 inside the 1in page margins. While the print dialog is open, the page resizes to that measure and justif re-justifies for it; closing the dialog restores the screen layout.
 - Printed code blocks no longer jump whole to the next page and leave a large gap, or a fully blank page in Chromium. A code block that is taller than a page no longer has a line cut in half at the page edge. The print styles now lay out the `<code>` inside a `<pre>` as a block, so it breaks between lines.
+- Printed links have black underlines. They kept the pale screen underline color, which nearly vanished on paper.
 
 ## [0.3.0]
 

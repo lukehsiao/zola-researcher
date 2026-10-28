@@ -468,6 +468,12 @@ h6:hover .zola-anchor {
     @include print-column;
   }
 
+  /* The screen underline uses $ui-2, a pale gray that the reset does not
+   * touch. On paper it nearly vanishes, so readers cannot see the links. */
+  a {
+    text-decoration-color: currentColor;
+  }
+
   .meta,
   #navlist,
   .button,
