@@ -11,11 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A `main_attrs` block in `index.html`, which `section.html` and `404.html` override to keep themselves out of the search index.
 - `$blue-2`, the accent pair inverted: Flexoki's 400 step on paper and its 600 step on black. The search icon uses it so it does not read as the loudest thing in the navbar.
 - A light palette. Every color is a `light-dark()` pair of Flexoki's light and dark values, so the theme follows the system color scheme with no toggle or JavaScript. Browsers without `light-dark()` support (before Chrome 123, Firefox 120, and Safari 17.5) fall back to their default colors.
+- A `youtube` class on the YouTube component's player wrapper, so styles can target the player without matching its inline styles.
 
 ### Changed
 - `main.css`, `custom_css` stylesheets, and `search.js` are linked with `cachebust=true`, so their URLs carry a hash of their contents and change whenever the files do. A deploy can no longer pair new markup with a stylesheet a browser or CDN cached from the previous one.
 - `<meta name="color-scheme">` declares `light dark`, and `theme-color` is set per scheme.
 - The example configuration highlights code with `light_theme` and `dark_theme` (Catppuccin Latte and Mocha) so code blocks follow the scheme.
+- Printed pages leave out the table of contents, embedded YouTube players, and the `.webring` section with its attribution. A video's caption still prints.
 
 ## [0.3.0]
 
