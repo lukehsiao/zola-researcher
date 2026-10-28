@@ -461,7 +461,7 @@ h6:hover .zola-anchor {
    * size. At the default root size, 1rem is 12pt. */
   body {
     font-size: 1rem;
-    line-height: 1.2;
+    line-height: $print-line-height;
   }
 
   .justif .container {
@@ -477,8 +477,50 @@ h6:hover .zola-anchor {
     display: none;
   }
 
-  p {
-    page-break-inside: avoid;
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    break-after: avoid;
+    break-inside: avoid;
+
+    /* Gecko ignores break-after: avoid. This invisible block makes the
+     * unbreakable heading need room below it. So a heading with no room below
+     * it moves to the next page. The room is three body lines: about one for
+     * the gap below the heading and two for the CSS default of orphans: 2. The
+     * negative margin gives the space back, so the layout does not change. */
+    &::after {
+      content: "";
+      display: block;
+      height: 3rem * $print-line-height;
+      margin-bottom: -3rem * $print-line-height;
+    }
+  }
+
+  figure,
+  table {
+    break-inside: avoid;
+  }
+
+  /* Browsers move a block that avoids breaks to a new page before they split
+   * it, even when it cannot fit on one page. A tall code block would leave a
+   * mostly empty page behind it, so only short ones avoid breaks. Inside two
+   * $print-margin margins, a Letter page has 9in of height. That holds about
+   * 45 lines of 0.95rem code at line-height 1.2. The limit of 40 leaves room
+   * for padding and a few wrapped lines. Only highlighted blocks have
+   * per-line elements to count. Other blocks break where they fall. */
+  pre:has(.giallo-l):not(:has(.giallo-l:nth-child(40))) {
+    break-inside: avoid;
+  }
+
+  /* The <code> in each <pre> is an inline-block, which cannot split across
+   * pages. So the whole code block jumps to the next page and leaves a gap.
+   * A tall one is then cut at the page edge, which can slice a line in half.
+   * As a block, the <code> breaks between lines. */
+  pre code {
+    display: block;
   }
 
   /* Paper cannot scroll, so long code lines wrap instead of clipping. Tokens
