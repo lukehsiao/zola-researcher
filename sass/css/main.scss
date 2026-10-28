@@ -523,6 +523,13 @@ h6:hover .zola-anchor {
     display: block;
   }
 
+  /* Only images inside a figure have a width cap. Any other wide image would
+   * run past the right margin, because paper cannot scroll. */
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
   /* Paper cannot scroll, so long code lines wrap instead of clipping. Tokens
    * with no break point, such as URLs and box-drawing rules, break anywhere.
    * The border replaces the background that the reset removes. */

@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - In print, code blocks wrap long lines and break tokens that have no break point, so nothing is clipped at the right edge. Each code block gets a thin border in place of its background. In blocks with line numbers, wrapped lines hang by the width of the line-number gutter, so they align with the code. Table cells break long tokens, so wide tables wrap inside the column.
 - Printed body text is `1rem` instead of `12pt`, so it matches the size justif sets lines at for any root font size. At the default root size it is still 12pt.
 - Printed headings stay on the same page as the content after them. Paragraphs may now split across pages, so a long paragraph no longer drags its heading's content to the next page and strands the heading. Figures, tables, and highlighted code blocks under 40 lines move to the next page instead of splitting across two. Longer or unhighlighted code blocks break between lines where they fall, so they do not leave a mostly empty page behind them.
+- Printed images shrink to fit the column. Before, only images inside a figure had a width cap, so a wide image anywhere else would run past the right margin.
 
 ### Fixed
 - Printing a post from Firefox or another Gecko browser no longer leaves a wide gap after the published and updated dates in the metadata line. The print reset styled `::first-letter`, which made Gecko widen each item that holds a `<time>`. The reset no longer targets `::first-letter` or `::first-line`.
