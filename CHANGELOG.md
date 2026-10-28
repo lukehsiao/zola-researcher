@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The example configuration highlights code with `light_theme` and `dark_theme` (Catppuccin Latte and Mocha) so code blocks follow the scheme.
 - Printed pages leave out the table of contents, embedded YouTube players, and the `.webring` section with its attribution. A video's caption still prints.
 
+### Fixed
+- Printing a post from Firefox or another Gecko browser no longer leaves a wide gap after the published and updated dates in the metadata line. The print reset styled `::first-letter`, which made Gecko widen each item that holds a `<time>`. The reset no longer targets `::first-letter` or `::first-line`.
+
 ## [0.3.0]
 
 This is a breaking change to adopt Zola 0.23.0.
