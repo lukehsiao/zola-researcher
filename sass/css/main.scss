@@ -458,6 +458,36 @@ h6:hover .zola-anchor {
     page-break-inside: avoid;
   }
 
+  /* Paper cannot scroll, so long code lines wrap instead of clipping. Tokens
+   * with no break point, such as URLs and box-drawing rules, break anywhere.
+   * The border replaces the background that the reset removes. */
+  pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    border: 1px solid $tx-3;
+  }
+
+  /* A hanging indent sets wrapped text apart from the next line. Its width
+   * matches the line-number gutter, so wrapped text aligns with the code and
+   * not with the line numbers. Blocks without line numbers have no gutter to
+   * match, so their wrapped lines start at the code edge. */
+  .giallo-l:has(.giallo-ln) {
+    $hang: $giallo-ln-width + $giallo-ln-gap;
+    box-sizing: border-box;
+    padding-left: $hang;
+    text-indent: -$hang;
+  }
+
+  .giallo-ln {
+    text-indent: 0;
+  }
+
+  /* A long token in a cell would widen the table past the column. */
+  td,
+  th {
+    overflow-wrap: anywhere;
+  }
+
   @page {
     margin: 1in;
   }
@@ -472,11 +502,11 @@ h6:hover .zola-anchor {
 .giallo-ln {
   display: inline-block;
   user-select: none;
-  margin-right: 1ch;
+  margin-right: $giallo-ln-gap;
   /* Fits three-digit line numbers, so every block's code starts at the same
      indent regardless of its length. The pre's own padding supplies the left
      inset, and vertical padding here would stretch every numbered line. */
-  min-width: 3ch;
+  min-width: $giallo-ln-width;
   text-align: right;
   opacity: 0.8;
 }

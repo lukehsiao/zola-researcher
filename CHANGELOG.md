@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `<meta name="color-scheme">` declares `light dark`, and `theme-color` is set per scheme.
 - The example configuration highlights code with `light_theme` and `dark_theme` (Catppuccin Latte and Mocha) so code blocks follow the scheme.
 - Printed pages leave out the table of contents, embedded YouTube players, and the `.webring` section with its attribution. A video's caption still prints.
+- In print, code blocks wrap long lines and break tokens that have no break point, so nothing is clipped at the right edge. Each code block gets a thin border in place of its background. In blocks with line numbers, wrapped lines hang by the width of the line-number gutter, so they align with the code. Table cells break long tokens, so wide tables wrap inside the column.
 
 ### Fixed
 - Printing a post from Firefox or another Gecko browser no longer leaves a wide gap after the published and updated dates in the metadata line. The print reset styled `::first-letter`, which made Gecko widen each item that holds a `<time>`. The reset no longer targets `::first-letter` or `::first-line`.
