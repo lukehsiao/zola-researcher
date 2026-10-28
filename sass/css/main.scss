@@ -143,6 +143,22 @@ a:hover {
   }
 }
 
+@mixin print-column {
+  width: $print-measure;
+  max-width: none;
+}
+
+/*
+ * Chromium prints justif's prose with the line breaks set for the screen, so
+ * lines set for a wide window clip at the paper edge. justif-init.js sets
+ * this class while the print dialog is open. It then re-justifies the prose
+ * at the print measure. The print stylesheet pins the same width, so the
+ * lines justif sets are the lines that print.
+ */
+.justif.justif-print .container {
+  @include print-column;
+}
+
 .button {
   border-radius: 999rem;
   border-style: solid;
@@ -440,9 +456,16 @@ h6:hover .zola-anchor {
   }
 
   /* print styles go here */
+  /* justif sets its print lines in screen media, where the body is 1rem.
+   * Print at the same size, so its lines are the printed lines for any root
+   * size. At the default root size, 1rem is 12pt. */
   body {
-    font-size: 12pt;
+    font-size: 1rem;
     line-height: 1.2;
+  }
+
+  .justif .container {
+    @include print-column;
   }
 
   .meta,
@@ -489,7 +512,7 @@ h6:hover .zola-anchor {
   }
 
   @page {
-    margin: 1in;
+    margin: $print-margin;
   }
 }
 

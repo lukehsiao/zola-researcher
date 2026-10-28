@@ -36,3 +36,7 @@ $small-width: 480px;
 /* The code line-number gutter. The print hanging indent adds the two. */
 $giallo-ln-width: 3ch;
 $giallo-ln-gap: 1ch;
+$print-margin: 1in;
+/* With $print-margin on each side, US Letter leaves 6.5in and A4 leaves
+ * 6.27in. This measure fits both. */
+$print-measure: 6.25in;

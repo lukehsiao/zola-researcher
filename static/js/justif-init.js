@@ -62,7 +62,7 @@ function enhance() {
   // (jitter growing toward each line's end). Any such element must set
   // `contain: inline-size` to decouple its width from content — the site does
   // this for the webring summaries.
-  justify(prose, {
+  return justify(prose, {
     hyphenate: hyphenateEnUS,
     // The 0.33 default leaves multi-line paragraphs whose last line already
     // clears a third of the measure in native CSS justification. The browser
@@ -77,4 +77,18 @@ function enhance() {
   });
 }
 
-enhance();
+const controller = enhance();
+
+// ResizeObserver does not fire during Chromium's print layout, so justif
+// would print the lines it set for the screen. Pin the column to the print
+// measure before the browser lays out the print. Then re-justify at once.
+// refresh() re-measures every paragraph synchronously, so the new lines are
+// in place when the handler returns.
+addEventListener("beforeprint", () => {
+  document.documentElement.classList.add("justif-print");
+  controller.refresh();
+});
+addEventListener("afterprint", () => {
+  document.documentElement.classList.remove("justif-print");
+  controller.refresh();
+});
